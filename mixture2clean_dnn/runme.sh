@@ -20,6 +20,9 @@ fi
 
 BACKEND="pytorch"
 
+# Hide info messages from TensorFlow. Warning and Error still enabled.
+export TF_CPP_MIN_LOG_LEVEL=1
+
 # Create mixture csv
 python utils/prepare_data.py create_mixture_csv --workspace=$WORKSPACE --speech_dir=$TR_SPEECH_DIR --noise_dir=$TR_NOISE_DIR --data_type=train --magnification=2
 python utils/prepare_data.py create_mixture_csv --workspace=$WORKSPACE --speech_dir=$TE_SPEECH_DIR --noise_dir=$TE_NOISE_DIR --data_type=test
