@@ -9,6 +9,9 @@ import numpy as np
 import argparse
 import csv
 import time
+import logging
+
+from tqdm import tqdm, trange
 import h5py
 import pickle
 try:
@@ -54,11 +57,10 @@ def create_mixture_csv(args):
     speech_names = [name for name in os.listdir(speech_dir) if name.lower().endswith('.wav')]
     noise_names = [name for name in os.listdir(noise_dir) if name.lower().endswith('.wav')]
     
-    cnt = 0
     f = open(out_csv_path, 'w')
     f.write('{}\t{}\t{}\t{}\n'.format('speech_name', 'noise_name', 'noise_onset', 'noise_offset'))
     
-    for speech_na in speech_names:
+    for speech_na in tqdm(speech_names,desc="Creating Mixture CSV"):
         
         # Read speech
         speech_path = os.path.join(speech_dir, speech_na)
@@ -76,7 +78,7 @@ def create_mixture_csv(args):
             raise Exception('data_type must be train | test!')
 
         # Mix one speech with different noises many times
-        for noise_na in selected_noise_names:
+        for noise_na in tqdm(selected_noise_names,disable=(len(selected_noise_names)<100)):
             noise_path = os.path.join(noise_dir, noise_na)
             (noise_audio, _) = read_audio(noise_path)
             
@@ -92,10 +94,7 @@ def create_mixture_csv(args):
                 noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
                 nosie_offset = noise_onset + len_speech
             
-            if cnt % 100 == 0:
-                print(cnt)
-                
-            cnt += 1
+
             f.write('{}\t{}\t{}\t{}\n'.format(speech_na, noise_na, noise_onset, nosie_offset))
     
     f.close()
@@ -133,9 +132,10 @@ def calculate_mixture_features(args):
         lis = list(reader)
     
     t1 = time.time()
-    cnt = 0
     
-    for i1 in range(1, len(lis)):
+    # Go through each feature, using TQDM trange() for progress bar
+    pbar = trange(1, len(lis), desc="Calculating {} features".format(data_type))
+    for i1 in pbar:
         
         [speech_na, noise_na, noise_onset, noise_offset] = lis[i1]
         noise_onset = int(noise_onset)
@@ -175,7 +175,7 @@ def calculate_mixture_features(args):
             
         create_folder(os.path.dirname(out_audio_path))
         write_audio(out_audio_path, mixed_audio, sample_rate)
-        print('Write mixture wav to: {}'.format(out_audio_path))
+        tqdm.write('Write mixture wav to: {}'.format(out_audio_path))
 
         # Extract spectrogram
         mixed_complx_x = calculate_spectrogram(mixed_audio, mode='complex')
@@ -190,11 +190,6 @@ def calculate_mixture_features(args):
         data = [mixed_complx_x, speech_x, noise_x, alpha, out_bare_name]
         cPickle.dump(data, open(out_feature_path, 'wb'))
         
-        # Print
-        if cnt % 100 == 0:
-            print(cnt)
-            
-        cnt += 1
 
     print('Extracting feature time: %s' % (time.time() - t1))
     
@@ -277,13 +272,11 @@ def pack_features(args):
     x_all = []  # (n_segs, n_concat, n_freq)
     y_all = []  # (n_segs, n_freq)
     
-    cnt = 0
-    t1 = time.time()
     
     # Load all features
     names = os.listdir(feature_dir)
     
-    for name in names:
+    for name in tqdm(names, desc="Packing features:"):
         
         # Load feature. 
         feature_path = os.path.join(feature_dir, name)
@@ -305,12 +298,6 @@ def pack_features(args):
         y = speech_x_3d[:, (n_concat - 1) // 2, :]
         y_all.append(y)
         
-        # Print. 
-        if cnt % 100 == 0:
-            print(cnt)
-            
-        # if cnt == 3: break
-        cnt += 1
         
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
@@ -324,7 +311,6 @@ def pack_features(args):
         hf.create_dataset('y', data=y_all)
     
     print('Write out to {}'.format(hdf5_path))
-    print('Pack features finished! {} s'.format(time.time() - t1,))
     
 
 ###
