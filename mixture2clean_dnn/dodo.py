@@ -189,10 +189,13 @@ def task_pack_features():
     feature_path = config["workspace"] / 'features'
     features = list(feature_path.rglob("*.p")) # Search for all .p files
 
+    packed_feature_path = config["workspace"] / 'packed_features' / 'spectrogram'
+
     return {
         'file_dep' :  features + get_source_files("utils"),
         'targets' : [
-           config["workspace"] / "packed_features"
+           packed_feature_path / "test" / f'{config["train_snr"]}db' / "data.h5",
+           packed_feature_path / "train" / f'{config["train_snr"]}db' / "data.h5"
         ],
         'actions': [
             PythonInteractiveAction(pack_features, ["train",  config["train_snr"], *shared_args]),
