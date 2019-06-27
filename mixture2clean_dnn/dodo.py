@@ -12,7 +12,7 @@ import os
 import sys
 sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 
-from utils.prepare_data import create_mixture_csv
+from utils import prepare_data
 
 from doit import get_var
 from doit.tools import create_folder, PythonInteractiveAction
@@ -20,7 +20,9 @@ from doit.tools import create_folder, PythonInteractiveAction
 config = {
     "fulldata": get_var('fulldata', None),
     "workspace": pathlib.Path(get_var('workspace', "workspace")),
-    "magnification": get_var('magnification', 2)
+    "magnification": get_var('magnification', 2),
+    "test_snr": get_var('te_snr', 0),
+    "train_snr": get_var('train_snr', 0)
 }
 
 
@@ -51,11 +53,6 @@ else:
 # Set tensorflow log level
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
-def task_make_workspace(): 
-    return {
-            'actions': [
-                (create_folder, [config["workspace"]])
-            ]}
 
 # Needed to get around the args nonsense
 class DictAttr(dict):
@@ -63,6 +60,10 @@ class DictAttr(dict):
         if key not in self:
             raise AttributeError(key)
         return self[key]
+
+#
+# Wrapper functions to pack args
+#
 
 def mix_csv(subdata, data_type, magnification=1):
     args = {
@@ -72,7 +73,22 @@ def mix_csv(subdata, data_type, magnification=1):
         "data_type":data_type,
         "magnification":magnification
     }
-    create_mixture_csv(DictAttr(args))
+    prepare_data.create_mixture_csv(DictAttr(args))
+
+
+def mix_features(subdata, data_type, snr):
+    args = {
+        "workspace":config["workspace"],
+        "speech_dir":subdata["speech"],
+        "noise_dir":subdata["noise"],
+        "data_type":data_type,
+        "snr":snr
+    }
+    prepare_data.calculate_mixture_features(DictAttr(args))
+
+#
+# Utility functions to get specific files
+#
 
 def get_source_files(folder):
     ''' Recursively get all python source files below folder '''
@@ -91,9 +107,24 @@ def get_data_filenames(data):
             filenames += list(wavfiles)
     return filenames
 
+
+# Get all input audio files
+data_files = get_data_filenames(data)
+
+#
+# The actual tasks themselves
+#
+def task_make_workspace(): 
+    ''' Create workspace folder if needed '''
+    return {
+            'actions': [
+                (create_folder, [config["workspace"]])
+            ]}
+
+
 def task_create_mixture_csv():
     return {
-        'file_dep' : get_data_filenames(data) + get_source_files("utils"),
+        'file_dep' :  data_files + get_source_files("utils"),
         # Using pathlib slash '/' operator
         'targets': [
             config["workspace"] / 'mixture_csvs' / 'test.csv',
@@ -107,5 +138,18 @@ def task_create_mixture_csv():
         ],
         'clean': True,
     }
-    
+
+def task_calculate_mixture_features():
+    return {
+        'file_dep' :  data_files + get_source_files("utils"),
+        'targets' : [
+            config["workspace"] / "mixed_audios",
+            config["workspace"] / "features",
+        ],
+        'actions': [
+            PythonInteractiveAction(mix_features, [data["train"], "train", config["train_snr"]] ),
+            PythonInteractiveAction(mix_features, [data["test"], "test", config["test_snr"]] ),
+        ],
+        'clean': True,
+    }
 
