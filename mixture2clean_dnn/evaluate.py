@@ -25,8 +25,11 @@ def calculate_pesq(args):
     te_snr = args.te_snr
     
     # Remove already existed file. 
-    os.system('rm _pesq_itu_results.txt')
-    os.system('rm _pesq_results.txt')
+    try:
+        os.remove('_pesq_itu_results.txt')
+        os.remove('_pesq_results.txt')
+    except FileNotFoundError:
+        pass # File does not exist, so no need to delete it
     
     # Calculate PESQ of all enhaced speech. 
     enh_speech_dir = os.path.join(workspace, 'enh_wavs', 'test', '{}db'.format(int(te_snr)))
