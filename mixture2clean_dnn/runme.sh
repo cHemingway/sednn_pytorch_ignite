@@ -49,9 +49,6 @@ python $BACKEND/main.py train --workspace=$WORKSPACE --tr_snr=$TR_SNR --te_snr=$
 ITERATION=10000
 python $BACKEND/main.py inference --workspace=$WORKSPACE --tr_snr=$TR_SNR --te_snr=$TE_SNR --iteration=$ITERATION --n_concat=$N_CONCAT
 
-# Plot training stat
-# python evaluate.py plot_training_stat --workspace=$WORKSPACE --tr_snr=$TR_SNR --bgn_iter=0 --fin_iter=10001 --interval_iter=1000
-
 # Calculate PESQ of all enhanced speech
 python evaluate.py calculate_pesq --workspace=$WORKSPACE --speech_dir=$TE_SPEECH_DIR --te_snr=$TE_SNR
 
