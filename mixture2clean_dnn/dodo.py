@@ -16,7 +16,7 @@ from utils import prepare_data
 
 from doit import get_var
 from doit.tools import \
-    create_folder, PythonInteractiveAction, config_changed, run_once
+    create_folder, Interactive, PythonInteractiveAction, config_changed, run_once
 
 config = {
     "fulldata": get_var('fulldata', None),
@@ -28,6 +28,8 @@ config = {
     "n_hop":     get_var('n_hop', 3)
 }
 
+# Keep backend out of config so can calculate without needing new features
+BACKEND = get_var('backend', "pytorch")
 
 data = {}
 if config["fulldata"]:
@@ -55,6 +57,11 @@ else:
 
 # Set tensorflow log level
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
+
+
+# Shared targets
+SCALAR_PATH = config["workspace"] / "packed_features" / "spectrogram" / "train" \
+               / f'{config["train_snr"]}db' / "scaler.p"
 
 
 # Needed to get around the args nonsense
@@ -214,12 +221,22 @@ def task_write_out_scalar():
     return {
         'file_dep' :  packed_features + get_source_files("utils"),
         'targets' : [
-           config["workspace"] / "packed_features" / "spectrogram" / "train" \
-               / f'{config["train_snr"]}db' / "scaler.p"
+            SCALAR_PATH
         ],
         'actions': [
             PythonInteractiveAction(write_out_scalar, ["train",  config["train_snr"]]),
         ],
         'uptodate': [config_changed(config)],
         'clean': True,
+    }
+
+def task_train():
+    return {
+        'file_dep': [SCALAR_PATH], # TODO rest of dependencies
+        'actions' : [Interactive(
+            f"python {BACKEND}/main.py train "
+            f"--workspace={config['workspace']} "
+            f"--tr_snr={config['train_snr']} --te_snr={config['test_snr']}"
+        )],
+        'uptodate': [config_changed(config), config_changed(BACKEND)],
     }
