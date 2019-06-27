@@ -224,12 +224,8 @@ def task_pack_features():
 
 
 def task_write_out_scalar():
-
-    packed_feature_path = config["workspace"] / 'packed_features'
-    packed_features = list(packed_feature_path.rglob("*.h5"))
-
     return {
-        'file_dep' :  packed_features + get_source_files("utils"),
+        'file_dep' :  PACKED_FEATURE_PATHS + get_source_files("utils"),
         'targets' : [
             SCALAR_PATH
         ],
@@ -239,6 +235,7 @@ def task_write_out_scalar():
         'uptodate': [config_changed(config)],
         'clean': True,
     }
+
 
 def task_train():
     return {
