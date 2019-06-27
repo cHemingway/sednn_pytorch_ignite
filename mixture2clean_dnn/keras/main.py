@@ -9,8 +9,6 @@ import sys
 sys.path.insert(1, os.path.join(sys.path[0], '../utils'))
 import numpy as np
 import argparse
-import h5py
-import math
 import time
 import pickle
 import matplotlib.pyplot as plt

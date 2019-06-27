@@ -3,8 +3,6 @@ import sys
 sys.path.insert(1, os.path.join(sys.path[0], '../utils'))
 import numpy as np
 import argparse
-import h5py
-import math
 import time
 import pickle
 import matplotlib.pyplot as plt
@@ -14,8 +12,6 @@ except:
     import _pickle as cPickle
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 
 from utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 

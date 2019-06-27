@@ -5,15 +5,11 @@ Created:  2017.12.22
 Modified: - 
 """
 import os
-import soundfile
 import numpy as np
 import argparse
 import csv
 import time
-import matplotlib.pyplot as plt
-from scipy import signal
 import h5py
-from sklearn import preprocessing
 import pickle
 try:
     import cPickle
