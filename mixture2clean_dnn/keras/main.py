@@ -147,7 +147,7 @@ def train(args):
     print('{} iterations / epoch'.format(int(train_x.shape[0] / batch_size)))
     
     # Debug plot
-    if True:
+    if False:
         fig, axs = plt.subplots(2,1, sharex=True)
         axs[0].matshow(train_x[0 : 1000, n_concat // 2, :].T, origin='lower', aspect='auto', cmap='jet')
         axs[1].matshow(train_y[0 : 1000, :].T, origin='lower', aspect='auto', cmap='jet')
