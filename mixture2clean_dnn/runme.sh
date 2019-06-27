@@ -18,10 +18,10 @@ else
   echo "Using full data. "
 fi
 
-BACKEND="pytorch"
+BACKEND="keras"
 
 # Hide info messages from TensorFlow. Warning and Error still enabled.
-TF_CPP_MIN_LOG_LEVEL=1
+export TF_CPP_MIN_LOG_LEVEL=1
 
 # Create mixture csv
 python utils/prepare_data.py create_mixture_csv --workspace=$WORKSPACE --speech_dir=$TR_SPEECH_DIR --noise_dir=$TR_NOISE_DIR --data_type=train --magnification=2
