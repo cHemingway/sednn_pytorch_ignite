@@ -15,14 +15,17 @@ sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 from utils import prepare_data
 
 from doit import get_var
-from doit.tools import create_folder, PythonInteractiveAction, config_changed
+from doit.tools import \
+    create_folder, PythonInteractiveAction, config_changed, run_once
 
 config = {
     "fulldata": get_var('fulldata', None),
     "workspace": pathlib.Path(get_var('workspace', "workspace")),
     "magnification": get_var('magnification', 2),
     "test_snr": get_var('te_snr', 0),
-    "train_snr": get_var('train_snr', 0)
+    "train_snr": get_var('train_snr', 0),
+    "n_concat": get_var('n_concat', 7),
+    "n_hop":     get_var('n_hop', 3)
 }
 
 
@@ -86,6 +89,18 @@ def mix_features(subdata, data_type, snr):
     }
     prepare_data.calculate_mixture_features(DictAttr(args))
 
+
+def pack_features(data_type, snr, n_concat, n_hop):
+    args = {
+        "workspace":config["workspace"],
+        "data_type":data_type,
+        "snr":snr,
+        "n_concat":n_concat,
+        "n_hop":n_hop
+    }
+    prepare_data.pack_features(DictAttr(args))
+
+
 #
 # Utility functions to get specific files
 #
@@ -117,6 +132,8 @@ data_files = get_data_filenames(data)
 def task_make_workspace(): 
     ''' Create workspace folder if needed '''
     return {
+            'targets': [ config["workspace"] ],
+            'uptodate': [run_once],
             'actions': [
                 (create_folder, [config["workspace"]])
             ]}
@@ -140,6 +157,7 @@ def task_create_mixture_csv():
         'clean': True,
     }
 
+
 def task_calculate_mixture_features():
     return {
         'file_dep' :  data_files + get_source_files("utils"),
@@ -155,3 +173,22 @@ def task_calculate_mixture_features():
         'clean': True,
     }
 
+
+def task_pack_features():
+    shared_args = [config["n_concat"], config["n_hop"]]
+
+    feature_path = config["workspace"] / 'features'
+    features = list(feature_path.rglob("*.p")) # Search for all .p files
+
+    return {
+        'file_dep' :  data_files + features+ get_source_files("utils"),
+        'targets' : [
+           config["workspace"] / "packed_features"
+        ],
+        'actions': [
+            PythonInteractiveAction(pack_features, ["train",  config["train_snr"], *shared_args]),
+            PythonInteractiveAction(pack_features, ["test", config["test_snr"], *shared_args]),
+        ],
+        'uptodate': [config_changed(config)],
+        'clean': True,
+    }
