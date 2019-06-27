@@ -21,7 +21,7 @@ else
   echo "Using full data. "
 fi
 
-BACKEND="keras"
+BACKEND="pytorch"
 
 # Hide info messages from TensorFlow. Warning and Error still enabled.
 export TF_CPP_MIN_LOG_LEVEL=1
