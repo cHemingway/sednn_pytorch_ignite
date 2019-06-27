@@ -277,3 +277,17 @@ def task_calculate_pesq():
             f"--speech_dir={data['test']['speech']} --te_snr={config['test_snr']} "
         )],
     }
+
+def task_get_stats():
+    ''' Calculate overall stats '''
+
+    # Cheat, grab targets from task_calculate_pesq
+    pesq_params = task_calculate_pesq()
+
+    return {
+        'file_dep': pesq_params['targets'],
+        'actions' : [Interactive(
+            f"python evaluate.py get_stats "
+        )],
+        'uptodate':[False] # Always run this
+    }
