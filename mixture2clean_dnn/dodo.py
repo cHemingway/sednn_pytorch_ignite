@@ -15,7 +15,7 @@ sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 from utils import prepare_data
 
 from doit import get_var
-from doit.tools import create_folder, PythonInteractiveAction
+from doit.tools import create_folder, PythonInteractiveAction, config_changed
 
 config = {
     "fulldata": get_var('fulldata', None),
@@ -136,6 +136,7 @@ def task_create_mixture_csv():
             PythonInteractiveAction(mix_csv, [data["train"], "train", config["magnification"]] ),
             PythonInteractiveAction(mix_csv, [data["test"], "test", config["magnification"]] ),
         ],
+        'uptodate': [config_changed(config)],
         'clean': True,
     }
 
@@ -150,6 +151,7 @@ def task_calculate_mixture_features():
             PythonInteractiveAction(mix_features, [data["train"], "train", config["train_snr"]] ),
             PythonInteractiveAction(mix_features, [data["test"], "test", config["test_snr"]] ),
         ],
+        'uptodate': [config_changed(config)],
         'clean': True,
     }
 
