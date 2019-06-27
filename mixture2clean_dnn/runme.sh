@@ -1,9 +1,12 @@
 #!/bin/bash
 
+# Exit on first error
+set -e
+
 MINIDATA=1
 if [ $MINIDATA -eq 1 ]; then
   WORKSPACE="workspace"
-  mkdir $WORKSPACE
+  mkdir -p $WORKSPACE
   TR_SPEECH_DIR="mini_data/train_speech"
   TR_NOISE_DIR="mini_data/train_noise"
   TE_SPEECH_DIR="mini_data/test_speech"
