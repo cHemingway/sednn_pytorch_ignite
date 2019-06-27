@@ -99,7 +99,7 @@ def create_mixture_csv(args):
     
     f.close()
     
-    print('Write {} mixture csv to {}!'.format(data_type, out_csv_path))
+    logging.info('Write {} mixture csv to {}!'.format(data_type, out_csv_path))
     
     
 ###
@@ -175,7 +175,8 @@ def calculate_mixture_features(args):
             
         create_folder(os.path.dirname(out_audio_path))
         write_audio(out_audio_path, mixed_audio, sample_rate)
-        tqdm.write('Write mixture wav to: {}'.format(out_audio_path))
+        if logging.DEBUG >= logging.root.level:
+            tqdm.write('Write mixture wav to: {}'.format(out_audio_path))
 
         # Extract spectrogram
         mixed_complx_x = calculate_spectrogram(mixed_audio, mode='complex')
@@ -191,7 +192,7 @@ def calculate_mixture_features(args):
         cPickle.dump(data, open(out_feature_path, 'wb'))
         
 
-    print('Extracting feature time: %s' % (time.time() - t1))
+    logging.debug('Extracting feature time: %s' % (time.time() - t1))
     
     
 def rms(y):
@@ -310,7 +311,7 @@ def pack_features(args):
         hf.create_dataset('x', data=x_all)
         hf.create_dataset('y', data=y_all)
     
-    print('Write out to {}'.format(hdf5_path))
+    logging.info('Write out to {}'.format(hdf5_path))
     
 
 ###
@@ -341,18 +342,32 @@ def write_out_scaler(args):
     # Compute scaler
     scaler = calculate_scaler(x, axis=(0, 1))
     
-    print(scaler)
+    if args.print_scalar or (logging.root.level == logging.DEBUG):
+        print(scaler)
     
     # Write out scaler
     pickle.dump(scaler, open(scaler_path, 'wb'))
     
-    print('Save scaler to {}'.format(scaler_path))
-    print('Compute scaler finished! {} s'.format(time.time() - t1,))
+    logging.debug('Save scaler to {}'.format(scaler_path))
+    logging.info('Compute scaler finished! {} s'.format(time.time() - t1,))
     
     
 ###
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-d', '--debug',
+        help="Show all debug information",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.WARNING,
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        help="Show more messages",
+        action="store_const", dest="loglevel", const=logging.INFO,
+    )
+
     subparsers = parser.add_subparsers(dest='mode')
 
     parser_create_mixture_csv = subparsers.add_parser('create_mixture_csv')
@@ -380,8 +395,12 @@ if __name__ == '__main__':
     parser_write_out_scaler.add_argument('--workspace', type=str, required=True)
     parser_write_out_scaler.add_argument('--data_type', type=str, required=True)
     parser_write_out_scaler.add_argument('--snr', type=float, required=True)
+    parser_write_out_scaler.add_argument('--print_scalar', action='store_true', default=False)
     
     args = parser.parse_args()
+
+    # Set logging verbosity
+    logging.basicConfig(level=args.loglevel)
     
     if args.mode == 'create_mixture_csv':
         create_mixture_csv(args)
