@@ -101,6 +101,15 @@ def pack_features(data_type, snr, n_concat, n_hop):
     prepare_data.pack_features(DictAttr(args))
 
 
+def write_out_scalar(data_type, snr):
+    args = {
+        "workspace":config["workspace"],
+        "data_type":data_type,
+        "snr":snr,
+        "print_scalar":False
+    }
+    prepare_data.write_out_scaler(DictAttr(args))
+
 #
 # Utility functions to get specific files
 #
@@ -181,13 +190,32 @@ def task_pack_features():
     features = list(feature_path.rglob("*.p")) # Search for all .p files
 
     return {
-        'file_dep' :  data_files + features+ get_source_files("utils"),
+        'file_dep' :  features + get_source_files("utils"),
         'targets' : [
            config["workspace"] / "packed_features"
         ],
         'actions': [
             PythonInteractiveAction(pack_features, ["train",  config["train_snr"], *shared_args]),
             PythonInteractiveAction(pack_features, ["test", config["test_snr"], *shared_args]),
+        ],
+        'uptodate': [config_changed(config)],
+        'clean': True,
+    }
+
+
+def task_write_out_scalar():
+
+    packed_feature_path = config["workspace"] / 'packed_features'
+    packed_features = list(packed_feature_path.rglob("*.h5"))
+
+    return {
+        'file_dep' :  packed_features + get_source_files("utils"),
+        'targets' : [
+           config["workspace"] / "packed_features" / "spectrogram" / "train" \
+               / f'{config["train_snr"]}db' / "scaler.p"
+        ],
+        'actions': [
+            PythonInteractiveAction(write_out_scalar, ["train",  config["train_snr"]]),
         ],
         'uptodate': [config_changed(config)],
         'clean': True,
