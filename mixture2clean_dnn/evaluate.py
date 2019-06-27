@@ -2,10 +2,11 @@
 Summary:  Calculate PESQ and overal stats of enhanced speech. 
 Author:   Qiuqiang Kong
 Created:  2017.12.22
-Modified: -
+Modified: 2019.06.26
 """
 import argparse
 import os
+import subprocess
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
@@ -79,9 +80,9 @@ def calculate_pesq(args):
         speech_na = na.split('.')[0]
         speech_path = os.path.join(speech_dir, '{}.WAV'.format(speech_na))
         
-        # Call executable PESQ tool. 
+        # Call executable PESQ tool, hiding output
         cmd = ' '.join(['./pesq', speech_path, enh_path, '+16000'])
-        os.system(cmd)        
+        subprocess.call(cmd, stdout=subprocess.DEVNULL, shell=True)   
         
         
 def get_stats(args):
