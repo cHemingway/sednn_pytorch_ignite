@@ -16,3 +16,6 @@ pesq
 # Specific files generated, should be in workspace really
 mini_data/test_speech/TEST_DR5_MRJM3_SI1809.wav
 mini_data/test_speech/TEST_DR4_FDMS0_SX48.wav
+
+#doit database
+.doit.*
