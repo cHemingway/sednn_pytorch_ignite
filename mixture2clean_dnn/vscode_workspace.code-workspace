@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.linting.ignorePatterns": [
+			".vscode/*.py",
+			"**{filename or pattern}**",
+			"keras/*.py",
+			"pytorch/*.py",
+			"utils/*.py"
+		],
+		"python.linting.pylintArgs": ["--init-hook",
+			"import sys; sys.path.append('/home/chris/repos/sednn_pytorch_ignite/mixture2clean_dnn/utils')"],
+	}
+}
