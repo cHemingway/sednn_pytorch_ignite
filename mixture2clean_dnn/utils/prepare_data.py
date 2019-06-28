@@ -92,15 +92,15 @@ def create_mixture_csv(args):
                 nosie_offset = len_speech
 
             else:
-            # If noise shorter than speech then noise will be repeated in calculating features
-            if len_noise <= len_speech:
-                noise_onset = 0
-                nosie_offset = len_speech
-                
-            # If noise longer than speech then randomly select a segment of noise
-            else:
-                noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
-                nosie_offset = noise_onset + len_speech
+                # If noise shorter than speech then noise will be repeated in calculating features
+                if len_noise <= len_speech:
+                    noise_onset = 0
+                    nosie_offset = len_speech
+                    
+                # If noise longer than speech then randomly select a segment of noise
+                else:
+                    noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
+                    nosie_offset = noise_onset + len_speech
             
 
             f.write('{}\t{}\t{}\t{}\n'.format(speech_na, noise_na, noise_onset, nosie_offset))
@@ -134,38 +134,41 @@ def calculate_mixture_features(args):
     # Paths
     mixture_csv_path = os.path.join(workspace, 'mixture_csvs', '{}.csv'.format(data_type))
     
-    # Open mixture csv. 
+    # Open mixture csv and convert to list of rows
     with open(mixture_csv_path, 'r') as f:
-        reader = csv.reader(f, delimiter='\t')
+        has_header = csv.Sniffer().has_header(f.read(1024)) # Check for header
+        f.seek(0)
+        reader = csv.DictReader(f, delimiter='\t')
+        if has_header:      # Skip header
+            next(reader)
         lis = list(reader)
     
     t1 = time.time()
     
-    # Go through each feature, using TQDM trange() for progress bar
-    pbar = trange(1, len(lis), desc="Calculating {} features".format(data_type))
-    for i1 in pbar:
+    # Go through each speech/noise pair, using TQDM trange() for progress bar
+    pbar = tqdm(lis, desc="Calculating {} features".format(data_type))
+    for pair in pbar:
         
-        [speech_na, noise_na, noise_onset, noise_offset] = lis[i1]
-        noise_onset = int(noise_onset)
-        noise_offset = int(noise_offset)
+        noise_onset = int(pair['noise_onset'])
+        noise_offset = int(pair['noise_offset'])
         
         # Read speech audio
-        speech_path = os.path.join(speech_dir, speech_na)
+        speech_path = os.path.join(speech_dir, pair['speech_name'])
         (speech_audio, _) = read_audio(speech_path, target_fs=sample_rate)
         
         # Read noise audio
-        noise_path = os.path.join(noise_dir, noise_na)
+        noise_path = os.path.join(noise_dir, pair['noise_name'])
         (noise_audio, _) = read_audio(noise_path, target_fs=sample_rate)
         
         # Repeat noise to the same length as speech
-        if len(noise_audio) < len(speech_audio):
+        if noise_audio.size < speech_audio.size:
             n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
             noise_audio_repeat = np.tile(noise_audio, n_repeat)
             noise_audio = noise_audio_repeat[0 : len(speech_audio)]
             
         # Truncate noise to the same length as speech
         else:
-            noise_audio = noise_audio[noise_onset : noise_offset]
+            noise_audio = noise_audio[noise_onset: noise_offset]
         
         # Scale speech to given snr
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
@@ -176,7 +179,7 @@ def calculate_mixture_features(args):
 
         # Write out mixed audio
         out_bare_name = os.path.join('{}.{}'.format(
-            os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
+            os.path.splitext(pair['speech_name'])[0], os.path.splitext(pair['noise_name'])[0]))
             
         out_audio_path = os.path.join(workspace, 'mixed_audios', 
             data_type, '{}db'.format(int(snr)), '{}.wav'.format(out_bare_name))
