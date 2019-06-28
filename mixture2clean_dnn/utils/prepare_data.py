@@ -25,6 +25,9 @@ from utilities import (create_folder, read_audio, write_audio,
 import config
 
 
+# ! HACK: fix onset of noise to zero
+FIXED_NOISE_ONSET = True
+
 ###
 def create_mixture_csv(args):
     """Create csv containing mixture information. 
@@ -84,6 +87,11 @@ def create_mixture_csv(args):
             
             len_noise = len(noise_audio)
 
+            if FIXED_NOISE_ONSET:
+                noise_onset = 0
+                nosie_offset = len_speech
+
+            else:
             # If noise shorter than speech then noise will be repeated in calculating features
             if len_noise <= len_speech:
                 noise_onset = 0
