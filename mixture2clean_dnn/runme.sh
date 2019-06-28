@@ -13,11 +13,11 @@ if [ $MINIDATA -eq 1 ]; then
   TE_NOISE_DIR="mini_data/test_noise"
   echo "Using mini data. "
 else
-  WORKSPACE="/vol/vssp/msos/qk/workspaces/speech_enhancement"
-  TR_SPEECH_DIR="/vol/vssp/msos/qk/workspaces/speech_enhancement/timit_wavs/train"
-  TR_NOISE_DIR="/vol/vssp/msos/qk/workspaces/speech_enhancement/nosie_wavs/train"
-  TE_SPEECH_DIR="/vol/vssp/msos/qk/workspaces/speech_enhancement/timit_wavs/subtest"
-  TE_NOISE_DIR="/vol/vssp/msos/qk/workspaces/speech_enhancement/nosie_wavs/test"
+  WORKSPACE="workspace"
+  TR_SPEECH_DIR="metadata/train_speech"
+  TR_NOISE_DIR="metadata/train_noise"
+  TE_SPEECH_DIR="metadata/test_speech"
+  TE_NOISE_DIR="metadata/test_speech"
   echo "Using full data. "
 fi
 
