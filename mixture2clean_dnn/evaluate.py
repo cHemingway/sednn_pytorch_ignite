@@ -38,8 +38,9 @@ def calculate_pesq(args):
         print(cnt, na)
         enh_path = os.path.join(enh_speech_dir, na)
         
+        # TODO: Work with both upper and lower case .wav and .WAV
         speech_na = na.split('.')[0]
-        speech_path = os.path.join(speech_dir, '{}.WAV'.format(speech_na))
+        speech_path = os.path.join(speech_dir, '{}.wav'.format(speech_na))
         
         # Call executable PESQ tool, hiding output
         cmd = ' '.join(['./pesq', speech_path, enh_path, '+16000'])
