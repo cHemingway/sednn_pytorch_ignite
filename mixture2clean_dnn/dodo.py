@@ -9,6 +9,7 @@
 
 import os
 import pathlib
+import shutil
 
 # HACK: Ideally would fix import paths instead
 import sys
@@ -164,6 +165,10 @@ def get_source_files(folder):
     return list(folder_path.rglob("*.py"))
 
 
+def delete_workspace():
+    ''' Utility function to delete workspace at end '''
+    shutil.rmtree(CONFIG["workspace"]) 
+
 #
 # The actual tasks themselves
 #
@@ -174,7 +179,10 @@ def task_make_workspace():
         'uptodate': [run_once],
         'actions': [
             (create_folder, [CONFIG["workspace"]])
-        ]}
+        ],
+        'clean':[delete_workspace],
+        'uptodate': [config_changed(str(CONFIG["workspace"]))],
+        }
 
 
 def task_create_mixture_csv():
