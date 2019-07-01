@@ -300,7 +300,7 @@ def task_get_stats():
     pesq_params = task_calculate_pesq()
 
     return {
-        'file_dep': pesq_params['targets'],
+        'file_dep': ['_pesq_results.txt', '_pesq_itu_results.txt'],
         'actions': [Interactive(
             f"python evaluate.py get_stats "
         )],
