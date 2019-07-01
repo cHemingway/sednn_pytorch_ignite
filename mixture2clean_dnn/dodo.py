@@ -208,7 +208,7 @@ def task_create_mixture_csv():
 
 def task_calculate_mixture_features():
     return {
-        'file_dep':  DATA_FILES + get_source_files("utils"),
+        'file_dep':  DATA_FILES + get_source_files("utils") + task_create_mixture_csv()['targets'],
         'targets': [
             CONFIG["workspace"] / "mixed_audios",
             CONFIG["workspace"] / "features",
