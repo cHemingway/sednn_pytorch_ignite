@@ -10,6 +10,7 @@ import subprocess
 import csv
 import numpy as np
 
+from tqdm import tqdm
 
 
 def calculate_pesq(args):
@@ -34,8 +35,9 @@ def calculate_pesq(args):
     # Calculate PESQ of all enhaced speech. 
     enh_speech_dir = os.path.join(workspace, 'enh_wavs', 'test', '{}db'.format(int(te_snr)))
     names = os.listdir(enh_speech_dir)
-    for (cnt, na) in enumerate(names):
-        print(cnt, na)
+    for (cnt, na) in enumerate(tqdm(names,desc="Calculating PESQ")):
+        if args.show_names: # Show name of original file on request
+            tqdm.write(na)
         enh_path = os.path.join(enh_speech_dir, na)
         
         # TODO: Work with both upper and lower case .wav and .WAV
@@ -89,6 +91,7 @@ if __name__ == '__main__':
     parser_calculate_pesq.add_argument('--workspace', type=str, required=True)
     parser_calculate_pesq.add_argument('--speech_dir', type=str, required=True)
     parser_calculate_pesq.add_argument('--te_snr', type=float, required=True)
+    parser_calculate_pesq.add_argument('--show_names',action='store_true',default=False)
     
     parser_get_stats = subparsers.add_parser('get_stats')
     
