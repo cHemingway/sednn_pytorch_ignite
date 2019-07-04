@@ -46,6 +46,7 @@ def train(args):
     models_dir = os.path.join(workspace, 'models', '{}db'.format(int(tr_snr)))
 
     # Datasets & dataloader
+    print("Scaling data...")
     train_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
     test_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
 
@@ -56,14 +57,13 @@ def train(args):
     # Data loader
     # TODO: setting num_workers > 1 breaks CUDA? Needs restart to fix!
     # See https://github.com/pytorch/pytorch/issues/2517
+    print("Loading data...")
     train_loader = torch.utils.data.DataLoader(train_dataset, 
                                             batch_size=batch_size, 
-                                            shuffle=True,
-                                            num_workers=1)
+                                            shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset,
                                             batch_size=batch_size, 
-                                            shuffle=True,
-                                            num_workers=1)
+                                            shuffle=True)
 
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -96,9 +96,14 @@ def train(args):
             .format(trainer.state.epoch, 0, metrics['loss']))
 
     # Handler to save checkpoints
-    chkpoint_handler = ModelCheckpoint(models_dir, filename_prefix="chkpoint_", save_interval=2)
+    chkpoint_handler = ModelCheckpoint(models_dir, 
+                                        filename_prefix="chkpoint_", 
+                                        save_interval=2, # Save every 2nd epoch
+                                        require_empty=False # Overwrite
+                                        )
     trainer.add_event_handler(Events.EPOCH_COMPLETED, chkpoint_handler, {'ignite_model': model})
     
+    print("Starting training")
     trainer.run(train_loader, max_epochs=10)
 
 if __name__ == '__main__':

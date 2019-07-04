@@ -53,8 +53,8 @@ class NoisySpeechFeaturesDataset(Dataset):
         """
         x,y = self.x[idx,], self.y[idx,]
 
-        if torch.cuda.is_available:
-            x = x.cuda(); y = y.cuda()
+        if torch.cuda.is_available():
+            x = x.to('cuda'); y = y.to('cuda')
 
         return x,y
 
