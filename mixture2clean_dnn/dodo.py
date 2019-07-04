@@ -18,7 +18,7 @@ sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 #pylint: disable=wrong-import-position
 from utils import prepare_data
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
-                        create_folder, run_once)
+                        create_folder, run_once, result_dep)
 from doit import get_var
 
 CONFIG = {
@@ -239,7 +239,7 @@ def task_pack_features():
             PythonInteractiveAction(
                 pack_features, ["test", CONFIG["test_snr"], *shared_args]),
         ],
-        'uptodate': [config_changed(CONFIG)],
+        'uptodate': [config_changed(CONFIG), result_dep('calculate_mixture_features')],
         'clean': True,
     }
 
@@ -267,7 +267,7 @@ def task_train():
             MODEL_PATH
         ],
         'actions': [Interactive(
-            f"python {BACKEND}/main.py train "
+            f"python {BACKEND}/main_ignite.py train "
             f"--workspace={CONFIG['workspace']} "
             f"--tr_snr={CONFIG['train_snr']} --te_snr={CONFIG['test_snr']}"
         )],
