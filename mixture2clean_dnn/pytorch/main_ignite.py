@@ -14,6 +14,8 @@ from ignite.metrics import Loss, RunningAverage
 from ignite.handlers import ModelCheckpoint
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 
+from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OutputHandler, OptimizerParamsHandler
+
 from utilities import create_folder, load_hdf5
 from models import DNN
 import config
@@ -82,10 +84,20 @@ def train(args):
 
     # TODO make difference between training and test loss clear
     
+    # Progress bar attach
     RunningAverage(output_transform=lambda x: x).attach(trainer, 'loss')
-    
     pbar = ProgressBar(persist=True)
     pbar.attach(trainer, ['loss'])
+
+    # Tensorboard attach, training loss and optimizer params
+    tb_logger = TensorboardLogger(os.path.join(workspace, 'tensorboard'))
+    tb_logger.attach(trainer,
+                 log_handler=OutputHandler(tag="training", output_transform=lambda loss: {'loss': loss}),
+                 event_name=Events.ITERATION_COMPLETED)
+
+    tb_logger.attach(trainer,
+                 log_handler=OptimizerParamsHandler(optimizer),
+                 event_name=Events.ITERATION_STARTED)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_test_results(trainer):
@@ -101,10 +113,20 @@ def train(args):
                                         save_interval=2, # Save every 2nd epoch
                                         require_empty=False # Overwrite
                                         )
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, chkpoint_handler, {'ignite_model': model})
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, chkpoint_handler, 
+                                {
+                                    'ig_model': model,
+                                    'ig_optimizer': optimizer    
+                                })
     
     print("Starting training")
-    trainer.run(train_loader, max_epochs=10)
+    try:
+        trainer.run(train_loader, max_epochs=10)
+    except KeyboardInterrupt:
+        print("Interrupted, exiting..")
+
+    # We need to close the logger with we are done
+    tb_logger.close()
 
 if __name__ == '__main__':
 
