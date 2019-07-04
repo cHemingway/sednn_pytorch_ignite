@@ -303,21 +303,21 @@ def pack_features(args):
     
         # Cut input spectrogram to 3D segments with n_concat. 
         mixed_x_3d = mat_2d_to_3d(mixed_x, agg_num=n_concat, hop=n_hop)
+        mixed_x_3d = log_sp(mixed_x_3d).astype(np.float32)
         x_all.append(mixed_x_3d)
         
         # Cut target spectrogram and take the center frame of each 3D segment. 
         speech_x_3d = mat_2d_to_3d(speech_x, agg_num=n_concat, hop=n_hop)
         y = speech_x_3d[:, (n_concat - 1) // 2, :]
+        y = log_sp(y).astype(np.float32) 
         y_all.append(y)
         
         
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
     
-    x_all = log_sp(x_all).astype(np.float32)
-    y_all = log_sp(y_all).astype(np.float32)
-    
     # Write out data to hdf5 file. 
+    logging.debug("Saving..")
     with h5py.File(hdf5_path, 'w') as hf:
         hf.create_dataset('x', data=x_all)
         hf.create_dataset('y', data=y_all)
