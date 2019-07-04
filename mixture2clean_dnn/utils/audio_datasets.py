@@ -5,7 +5,7 @@ import pickle
 import torch
 from torch.utils.data import Dataset
 
-from utils.utilities import (load_hdf5)
+from utilities import (load_hdf5)
 
 class NoisySpeechFeaturesDataset(Dataset):
     ''' Dataset for noisy speech features only '''
@@ -33,6 +33,7 @@ class NoisySpeechFeaturesDataset(Dataset):
             self.scale(self.x)
             self.scale(self.y)
 
+
     def scale(self, x):
         ''' Scale value in place by scalar '''
         x.sub_(self.scale_mean) # Todo operate on last dimension
@@ -48,13 +49,17 @@ class NoisySpeechFeaturesDataset(Dataset):
             idx {int} -- Index of pair
         
         Returns:
-            x,y -- Pytorch 
+            x,y -- Pytorch Tensors of input, output
         """
-        # TODO Check indexes
-        return self.x[idx,], self.y[idx,]
+        x,y = self.x[idx,], self.y[idx,]
+
+        if torch.cuda.is_available:
+            x = x.cuda(); y = y.cuda()
+
+        return x,y
 
 
-    def get_properties():
+    def get_properties(self):
         ''' Returns a directory of the dataset properties  
         Usage:
             DNN(... . get_properties())
