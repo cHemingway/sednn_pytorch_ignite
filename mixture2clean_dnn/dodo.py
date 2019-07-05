@@ -23,12 +23,22 @@ from doit import get_var, create_after
 
 CONFIG = {
     "fulldata": get_var('fulldata', None),
-    "workspace": pathlib.Path(get_var('workspace', "workspace")),
     "magnification": get_var('magnification', 2),
     "test_snr": get_var('te_snr', 0),
     "train_snr": get_var('train_snr', 0),
     "n_concat": get_var('n_concat', 7),
     "n_hop":     get_var('n_hop', 3)
+}
+
+# Use different default workspace for full data
+CONFIG["workspace"] = pathlib.Path(
+    get_var('workspace', 
+            "workspace_full" if CONFIG["fulldata"] else "workspace")
+)
+
+# Use different doit database for full and partial data
+DOIT_CONFIG = {
+    'dep_file': '.doit{}.db'.format('_fulldata' if CONFIG['fulldata'] else '')
 }
 
 # Keep backend out of CONFIG so can calculate without needing new features
@@ -171,7 +181,10 @@ def get_source_files(folder):
 
 def delete_workspace():
     ''' Utility function to delete workspace at end '''
-    shutil.rmtree(CONFIG["workspace"]) 
+    try:
+        shutil.rmtree(CONFIG["workspace"]) 
+    except FileNotFoundError:
+        pass # Already been deleted
 
 #
 # The actual tasks themselves

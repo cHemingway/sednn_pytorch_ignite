@@ -11,6 +11,7 @@ __pycache__/
 # Project specific files
 metadata
 workspace
+workspace_full
 _pesq_itu_results.txt
 _pesq_results.txt
 # PESQ executable, license prohibits upload
@@ -21,4 +22,4 @@ mini_data/test_speech/TEST_DR5_MRJM3_SI1809.wav
 mini_data/test_speech/TEST_DR4_FDMS0_SX48.wav
 
 #doit database
-.doit.*
+.doit*
