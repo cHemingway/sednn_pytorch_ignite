@@ -285,15 +285,14 @@ def inference(args):
         'train', '{}db'.format(int(tr_snr)), 'scaler.p')
     
     model_path = os.path.join(workspace, 'models', '{}db'.format(int(tr_snr)), 
-        'md_{}_iters.tar'.format(iteration))
+        'chkpoint__ig_model_10.pth')
         
     enh_audios_dir = os.path.join(workspace, 'enh_wavs', data_type, 
         '{}db'.format(int(te_snr)))
 
     # Load model
     model = DNN(n_concat, freq_bins)    
-    checkpoint = torch.load(model_path)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(torch.load(model_path))
     
     if cuda:
         model.cuda()
