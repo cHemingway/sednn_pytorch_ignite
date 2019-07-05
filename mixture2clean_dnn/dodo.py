@@ -18,8 +18,8 @@ sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 #pylint: disable=wrong-import-position
 from utils import prepare_data
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
-                        create_folder, run_once, result_dep)
-from doit import get_var
+                        create_folder, run_once)
+from doit import get_var, create_after
 
 CONFIG = {
     "fulldata": get_var('fulldata', None),
@@ -94,7 +94,11 @@ SCALAR_PATH = CONFIG["workspace"] / "packed_features" / "spectrogram" / "train" 
     / f'{CONFIG["train_snr"]}db' / "scaler.p"
 
 MODEL_PATH = CONFIG["workspace"] / 'models' / f'{CONFIG["train_snr"]}db' \
-    / f'md_{ITERATION}_iters.tar'
+    / f'chkpoint__ig_model_10.pth'
+
+
+ENH_WAVS_DIR = CONFIG['workspace']/"enh_wavs"/"test" \
+    / "{}db".format(CONFIG['test_snr'])
 
 print(MODEL_PATH)
 
@@ -224,6 +228,7 @@ def task_calculate_mixture_features():
     }
 
 
+@create_after(executed='calculate_mixture_features', target_regex='.*\data.h5')
 def task_pack_features():
     shared_args = [CONFIG["n_concat"], CONFIG["n_hop"]]
 
@@ -231,7 +236,7 @@ def task_pack_features():
     features = list(feature_path.rglob("*.p"))  # Search for all .p files
 
     return {
-        'file_dep':  features + get_source_files("utils"),
+        'file_dep': features + get_source_files("utils"), 
         'targets': PACKED_FEATURE_PATHS,
         'actions': [
             PythonInteractiveAction(
@@ -239,7 +244,7 @@ def task_pack_features():
             PythonInteractiveAction(
                 pack_features, ["test", CONFIG["test_snr"], *shared_args]),
         ],
-        'uptodate': [config_changed(CONFIG), result_dep('calculate_mixture_features')],
+        'uptodate': [config_changed(CONFIG)],
         'clean': True,
     }
 
@@ -261,7 +266,6 @@ def task_write_out_scalar():
 
 def task_train():
     return {
-        # TODO rest of dependencies
         'file_dep': [SCALAR_PATH] + get_source_files(BACKEND) + PACKED_FEATURE_PATHS,
         'targets': [
             MODEL_PATH
@@ -275,23 +279,25 @@ def task_train():
 
 
 def task_inference():
-    test_data = get_data_filenames(DATA, ['test'])  # Get only the deps
+    test_data = get_data_filenames(DATA, ['test'])  # Get only the test set
     return {
-        'file_dep': test_data + get_source_files(BACKEND) + [MODEL_PATH] + PACKED_FEATURE_PATHS,
-        # TODO targets
+        'file_dep': test_data + get_source_files(BACKEND),
+        'targets': [
+            ENH_WAVS_DIR
+        ],
         'actions': [Interactive(
-            f"python {BACKEND}/main.py inference "
+            f"python {BACKEND}/main_ignite.py inference "
             f"--workspace={CONFIG['workspace']} "
             f"--tr_snr={CONFIG['train_snr']} --te_snr={CONFIG['test_snr']} "
-            f"--iteration={ITERATION} --n_concat={CONFIG['n_concat']}"
+            f"--n_concat={CONFIG['n_concat']}"
         )]
     }
 
-
+@create_after(executed='calculate_mixture_features')
 def task_calculate_pesq():
     ''' Calculate PESQ of all enhanced speech '''
     return {
-        # TODO: Get file_dep from inference target
+        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")),
         'targets': ['_pesq_results.txt', '_pesq_itu_results.txt'],
         'actions': [Interactive(
             f"python evaluate.py calculate_pesq "
