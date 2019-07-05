@@ -5,6 +5,8 @@ import argparse
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -14,13 +16,26 @@ from ignite.metrics import Loss, RunningAverage
 from ignite.handlers import ModelCheckpoint
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 
-from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, OutputHandler, OptimizerParamsHandler
+from ignite.contrib.handlers.tensorboard_logger import (
+    TensorboardLogger, OutputHandler, OptimizerParamsHandler, WeightsHistHandler)
 
 from utilities import create_folder, load_hdf5
 from models import DNN
 import config
 
 from audio_datasets import NoisySpeechFeaturesDataset
+
+
+def plot_spectrogram(x,y,n_concat):
+    ''' Given Tensors x,y, returns a figure of the first 1000 items '''
+    fig, axs = plt.subplots(2,1, sharex=True)
+    axs[0].matshow(x[0 : 1000, n_concat // 2, :].numpy().T, origin='lower', aspect='auto', cmap='jet')
+    axs[1].matshow(y[0 : 1000, :].numpy().T, origin='lower', aspect='auto', cmap='jet')
+    axs[0].set_title('Mixture')
+    axs[1].set_title('Clean')
+    plt.tight_layout()
+    return fig
+
 
 def train(args):
 
@@ -91,6 +106,13 @@ def train(args):
 
     # Tensorboard attach, training loss and optimizer params
     tb_logger = TensorboardLogger(os.path.join(workspace, 'tensorboard'))
+
+    # Plot spectrogram before/after cleaning
+    n_concat = train_dataset.get_properties()['n_concat']
+    fig = plot_spectrogram(train_dataset.x,train_dataset.y,n_concat)
+    tb_logger.writer.add_figure('Spectrogram',fig,global_step=0,close=True)
+
+    # Attach tensorboard loggers
     tb_logger.attach(trainer,
                  log_handler=OutputHandler(tag="training", output_transform=lambda loss: {'loss': loss}),
                  event_name=Events.ITERATION_COMPLETED)
@@ -98,6 +120,10 @@ def train(args):
     tb_logger.attach(trainer,
                  log_handler=OptimizerParamsHandler(optimizer),
                  event_name=Events.ITERATION_STARTED)
+
+    tb_logger.attach(trainer,
+                log_handler=WeightsHistHandler(model),
+                event_name=Events.EPOCH_COMPLETED)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_test_results(trainer):
