@@ -181,7 +181,6 @@ def inference(args):
       n_concat: int, number of frames to concatenta, should equal to n_concat 
           in the training stage. 
       iter: int, iteration of model to load. 
-      visualize: bool, plot enhanced spectrogram for debug. 
     """
     # This function is from original sednn codebase, lightly modified
     
@@ -190,7 +189,6 @@ def inference(args):
     tr_snr = args.tr_snr
     te_snr = args.te_snr
     n_concat = args.n_concat
-    visualize = args.visualize
     data_type = 'test'
     
     window_size = config.window_size
