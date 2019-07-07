@@ -27,7 +27,7 @@ CONFIG = {
     "test_snr": get_var('te_snr', 0),
     "train_snr": get_var('train_snr', 0),
     "n_concat": get_var('n_concat', 7),
-    "n_hop":     get_var('n_hop', 3)
+    "n_hop":     get_var('n_hop', 3),
 }
 
 # Use different default workspace for full data
@@ -40,6 +40,18 @@ CONFIG["workspace"] = pathlib.Path(
 DOIT_CONFIG = {
     'dep_file': '.doit{}.db'.format('_fulldata' if CONFIG['fulldata'] else '')
 }
+
+# Config specific to SEGAN only
+SEGAN_CONFIG = {
+     # Root folder of segan installation
+    "path":   pathlib.Path(get_var('segan_path', '/home/chris/repos/segan_pytorch')),
+    # HACK: Hardcode path for python EXE needed for SEGAN
+    # _should_ use conda run instead, but breaks for some reason, not sure why
+    'python': "/home/chris/anaconda3/envs/segan_pytorch/bin/python"
+}
+
+SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan+"
+
 
 # Keep backend out of CONFIG so can calculate without needing new features
 BACKEND = get_var('backend', "pytorch")
@@ -195,7 +207,8 @@ def task_make_workspace():
         'targets': [CONFIG["workspace"]],
         'uptodate': [run_once],
         'actions': [
-            (create_folder, [CONFIG["workspace"]])
+            (create_folder, [CONFIG["workspace"]]),
+            (create_folder, [SEGAN_OUTPUT_FOLDER])
         ],
         'clean':[delete_workspace],
         'uptodate': [config_changed(str(CONFIG["workspace"]))],
@@ -294,7 +307,7 @@ def task_train():
 def task_inference():
     test_data = get_data_filenames(DATA, ['test'])  # Get only the test set
     return {
-        'file_dep': test_data + get_source_files(BACKEND),
+        'file_dep': test_data + get_source_files(BACKEND), # TODO Add checkpoint
         'targets': [
             ENH_WAVS_DIR
         ],
@@ -305,6 +318,25 @@ def task_inference():
             f"--n_concat={CONFIG['n_concat']}"
         )]
     }
+
+
+def task_segan_inference():
+    # TODO dependency is mixed_wav_dir
+    return {
+        'file_dep': get_source_files(SEGAN_CONFIG['path']),
+        'targets': [
+            SEGAN_OUTPUT_FOLDER
+        ],
+        'actions': [Interactive(
+            f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'clean.py'} "
+            f"--g_pretrained_ckpt {SEGAN_CONFIG['path']/'ckpt_segan+/segan+_generator.ckpt'} "
+            f"--test_files {CONFIG['workspace']/ 'mixed_audios/test' / str(CONFIG['test_snr'])}db "
+            f"--cfg_file {SEGAN_CONFIG['path']/'ckpt_segan+/train.opts'} "
+            f"--synthesis_path {SEGAN_OUTPUT_FOLDER} " #TODO move into workspace
+            f"--soundfile" # Use libsoundfile backend to save
+        )]
+    }
+
 
 @create_after(executed='calculate_mixture_features')
 def task_calculate_pesq():
