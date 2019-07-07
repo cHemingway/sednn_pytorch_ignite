@@ -50,7 +50,8 @@ SEGAN_CONFIG = {
     'python': "/home/chris/anaconda3/envs/segan_pytorch/bin/python"
 }
 
-SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan+"
+# Cannot use "+" in folder due to PESQ limitations
+SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan"
 
 
 # Keep backend out of CONFIG so can calculate without needing new features
@@ -338,30 +339,43 @@ def task_segan_inference():
     }
 
 
-@create_after(executed='calculate_mixture_features')
+@create_after(executed='inference')
 def task_calculate_pesq():
     ''' Calculate PESQ of all enhanced speech '''
     return {
         'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")),
-        'targets': ['_pesq_results.txt', '_pesq_itu_results.txt'],
-        'actions': [Interactive(
-            f"python evaluate.py calculate_pesq "
-            f"--workspace={CONFIG['workspace']} "
-            f"--speech_dir={DATA['test']['speech']} --te_snr={CONFIG['test_snr']} "
-        )],
+        'targets': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
+        'actions': [
+            # Evaluate PESQ
+            Interactive(
+                f"python evaluate.py calculate_pesq "
+                f"--workspace={CONFIG['workspace']} "
+                f"--speech_dir={DATA['test']['speech']} --te_snr={CONFIG['test_snr']} "
+            ),
+            "mv _pesq_results.txt dnn_pesq_results.txt",
+            # Evaluate SEGAN
+            Interactive(
+                f"python evaluate.py calculate_pesq "
+                f"--workspace={CONFIG['workspace']} "
+                f"--speech_dir={DATA['test']['speech']} "
+                f"--enh_speech_dir={SEGAN_OUTPUT_FOLDER} "
+                f"--te_snr={CONFIG['test_snr']} "
+            ),
+            "mv _pesq_results.txt segan_pesq_results.txt"
+        ],
     }
 
 
 def task_get_stats():
     ''' Calculate overall stats '''
-
-    # Cheat, grab targets from task_calculate_pesq
-    pesq_params = task_calculate_pesq()
-
     return {
-        'file_dep': ['_pesq_results.txt', '_pesq_itu_results.txt'],
-        'actions': [Interactive(
-            f"python evaluate.py get_stats "
-        )],
+        'file_dep': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
+        'actions': [
+            Interactive("echo DNN ------------------"),
+            Interactive("python evaluate.py get_stats --pesq_path=dnn_pesq_results.txt"),
+            Interactive("echo SEGAN+  -------------"),
+            Interactive("python evaluate.py get_stats --pesq_path=segan_pesq_results.txt")
+        ],
+        
         'uptodate': [False]  # Always run this
     }

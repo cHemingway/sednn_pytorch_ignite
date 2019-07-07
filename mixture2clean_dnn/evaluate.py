@@ -23,6 +23,7 @@ def calculate_pesq(args):
     """
     workspace = args.workspace
     speech_dir = args.speech_dir
+    enh_speech_dir = args.enh_speech_dir
     te_snr = args.te_snr
     
     # Remove already existed file. 
@@ -33,7 +34,9 @@ def calculate_pesq(args):
         pass # File does not exist, so no need to delete it
     
     # Calculate PESQ of all enhaced speech. 
-    enh_speech_dir = os.path.join(workspace, 'enh_wavs', 'test', '{}db'.format(int(te_snr)))
+    if not enh_speech_dir:
+        enh_speech_dir = os.path.join(workspace, 'enh_wavs', 'test', '{}db'.format(int(te_snr)))
+        
     names = os.listdir(enh_speech_dir)
     for (cnt, na) in enumerate(tqdm(names,desc="Calculating PESQ")):
         if args.show_names: # Show name of original file on request
@@ -52,7 +55,10 @@ def calculate_pesq(args):
 def get_stats(args):
     """Calculate stats of PESQ. 
     """
-    pesq_path = '_pesq_results.txt'
+    pesq_path = args.pesq_path
+    if not pesq_path:
+        pesq_path = '_pesq_results.txt'
+    
     with open(pesq_path, 'r') as f:
         reader = csv.reader(f, delimiter='\t')
         lis = list(reader)
@@ -90,10 +96,12 @@ if __name__ == '__main__':
     parser_calculate_pesq = subparsers.add_parser('calculate_pesq')
     parser_calculate_pesq.add_argument('--workspace', type=str, required=True)
     parser_calculate_pesq.add_argument('--speech_dir', type=str, required=True)
+    parser_calculate_pesq.add_argument('--enh_speech_dir', type=str, default=None)
     parser_calculate_pesq.add_argument('--te_snr', type=float, required=True)
     parser_calculate_pesq.add_argument('--show_names',action='store_true',default=False)
     
     parser_get_stats = subparsers.add_parser('get_stats')
+    parser_get_stats.add_argument('--pesq_path',type=str, default=None)
     
     args = parser.parse_args()
         
