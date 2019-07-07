@@ -361,7 +361,9 @@ def task_calculate_pesq():
                 f"--enh_speech_dir={SEGAN_OUTPUT_FOLDER} "
                 f"--te_snr={CONFIG['test_snr']} "
             ),
-            "mv _pesq_results.txt segan_pesq_results.txt"
+            "mv _pesq_results.txt segan_pesq_results.txt",
+            # Cleanup
+            "rm _pesq_itu_results.txt"
         ],
     }
 
