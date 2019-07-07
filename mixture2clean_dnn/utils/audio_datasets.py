@@ -51,11 +51,7 @@ class NoisySpeechFeaturesDataset(Dataset):
         Returns:
             x,y -- Pytorch Tensors of input, output
         """
-        x,y = self.x[idx,], self.y[idx,]
-
-        if torch.cuda.is_available():
-            x = x.to('cuda'); y = y.to('cuda')
-
+        x,y = self.x[idx,], self.y[idx,] # Don't use .cuda as done in DataLoader
         return x,y
 
 
