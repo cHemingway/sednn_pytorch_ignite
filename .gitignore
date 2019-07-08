@@ -1,2 +1,4 @@
 # IDE specific files
 .idea
+mixture2clean_dnn/segan_pesq_results.txt
+mixture2clean_dnn/dnn_pesq_results.txt
