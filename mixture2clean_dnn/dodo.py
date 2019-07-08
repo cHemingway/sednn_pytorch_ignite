@@ -120,6 +120,8 @@ MODEL_PATH = CONFIG["workspace"] / 'models' / f'{CONFIG["train_snr"]}db' \
     / f'chkpoint__ig_model_10.pth'
 
 
+MIXED_WAVS_DIR = CONFIG['workspace']/"mixed_audios"
+
 ENH_WAVS_DIR = CONFIG['workspace']/"enh_wavs"/"test" \
     / "{}db".format(CONFIG['test_snr'])
 
@@ -241,7 +243,7 @@ def task_calculate_mixture_features():
     return {
         'file_dep':  DATA_FILES + get_source_files("utils") + task_create_mixture_csv()['targets'],
         'targets': [
-            CONFIG["workspace"] / "mixed_audios",
+            MIXED_WAVS_DIR,
             CONFIG["workspace"] / "features",
         ],
         'actions': [
@@ -304,11 +306,11 @@ def task_train():
         )],
     }
 
-
+@create_after(executed='calculate_mixture_features', target_regex='*.wav')
 def task_inference():
-    test_data = get_data_filenames(DATA, ['test'])  # Get only the test set
+    mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
     return {
-        'file_dep': test_data + get_source_files(BACKEND), # TODO Add checkpoint
+        'file_dep': mixed + get_source_files(BACKEND), # TODO Add checkpoint
         'targets': [
             ENH_WAVS_DIR
         ],
@@ -321,10 +323,12 @@ def task_inference():
     }
 
 
+@create_after(executed='calculate_mixture_features', target_regex='*.wav')
 def task_segan_inference():
-    # TODO dependency is mixed_wav_dir
+    mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
     return {
-        'file_dep': get_source_files(SEGAN_CONFIG['path']),
+        # TODO Add model checkpoint and configuration to build
+        'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']),
         'targets': [
             SEGAN_OUTPUT_FOLDER
         ],
@@ -343,7 +347,7 @@ def task_segan_inference():
 def task_calculate_pesq():
     ''' Calculate PESQ of all enhanced speech '''
     return {
-        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")),
+        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
         'targets': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
         'actions': [
             # Evaluate PESQ
