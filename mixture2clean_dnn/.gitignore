@@ -2,6 +2,12 @@
 __pycache__/
 *.py[cod]
 
+# Mypy
+.mypy_cache
+
+# Pytest
+.pytest_cache
+
 # Profiles
 *.prof
 

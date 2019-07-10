@@ -11,6 +11,7 @@ dependencies:
   - astor=0.7.1=py_0
   - astroid=2.2.5=py37_0
   - audioread=2.1.6=py37_0
+  - autopep8=1.4.4=py_0
   - blas=1.0=mkl
   - bzip2=1.0.6=h14c3975_1002
   - c-ares=1.15.0=h14c3975_1001
@@ -80,6 +81,8 @@ dependencies:
   - mkl_fft=1.0.13=py37h516909a_1
   - mkl_random=1.0.4=py37hf2d7682_0
   - mock=3.0.5=py37_0
+  - mypy=0.711=py_0
+  - mypy_extensions=0.4.1=py37_1000
   - ncurses=6.1=hf484d3e_1002
   - nettle=3.4.1=h1bed415_1002
   - ninja=1.9.0=h6bb024c_0
@@ -94,7 +97,9 @@ dependencies:
   - pillow=6.1.0=py37he7afcd5_0
   - pip=19.1.1=py37_0
   - protobuf=3.8.0=py37he1b5a44_1
+  - psutil=5.6.3=py37h516909a_0
   - pthread-stubs=0.4=h14c3975_1001
+  - pycodestyle=2.5.0=py_0
   - pycosat=0.6.3=py37h14c3975_1001
   - pycparser=2.19=py37_1
   - pyinotify=0.9.6=py37_1000
@@ -130,6 +135,7 @@ dependencies:
   - torchvision=0.3.0=py37_cu10.0.130_1
   - tornado=6.0.3=py37h516909a_0
   - tqdm=4.32.1=py_0
+  - typed-ast=1.4.0=py37h516909a_0
   - urllib3=1.24.3=py37_0
   - werkzeug=0.15.4=py_0
   - wheel=0.33.4=py37_0
@@ -143,6 +149,9 @@ dependencies:
   - zstd=1.4.0=h3b9ef0a_0
   - pip:
     - doit-graph==0.1.1
+    - future==0.17.1
+    - mir-eval==0.5
+    - pystoi==0.2.2
     - soundfile==0.10.2
 prefix: /home/chris/anaconda3/envs/pytorch_sourcesep
 
