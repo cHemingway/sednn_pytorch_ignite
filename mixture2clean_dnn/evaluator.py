@@ -11,17 +11,17 @@ import numpy as np  # type: ignore
 
 import soundfile  # type: ignore
 from mir_eval.separation import bss_eval_sources  # type: ignore
-from pystoi.stoi import stoi
+from pystoi.stoi import stoi # type: ignore
 
 
 @dataclass
 class Metrics:
     """ dataclass for metrics for each file
     """
-    sdr: np.float_
-    sir: np.float_
-    sar: np.float_
-    stoi: np.float_
+    sdr: float
+    sir: float
+    sar: float
+    stoi: float
 
 
 def evaluate_metrics(dirty_file: Union[str, typing.BinaryIO],
@@ -54,6 +54,9 @@ def evaluate_metrics(dirty_file: Union[str, typing.BinaryIO],
     # Use compute_permutation as this is what bss did
     [sdr, sir, sar, _] = bss_eval_sources(
         clean, dirty, compute_permutation=True)
+
+    # Flatten out from numpy array as mono so single element
+    sdr = sdr.item(); sir=sir.item(); sar=sar.item()
 
     # Return value
     return Metrics(sdr=sdr, sir=sir, sar=sar, stoi=d)

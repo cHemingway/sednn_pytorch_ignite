@@ -33,3 +33,19 @@ class Test_evaluate_metrics(unittest.TestCase):
         metrics = evaluator.evaluate_metrics(self.dirty_file, self.clean_file)
         # Seems to be accurate to 4dp, which is good enough
         self.assertAlmostEqual(0.693646066121670, metrics.stoi, places=4)
+
+    def test_bss(self):
+        ''' Compare BSS results with MATLAB BSS_EVAL toolkit
+        This is what mir_eval.seperation is designed to follow, so should be correct
+        '''
+        metrics = evaluator.evaluate_metrics(self.dirty_file, self.clean_file)
+        
+        self.assertAlmostEqual(0.074943771664844, metrics.sdr, places=8)
+
+        # FIXME: Why is this Infinity? 
+        # MATLAB gives same, do we need different data for a proper test?
+        self.assertEqual(float("inf"), metrics.sir)
+
+        self.assertAlmostEqual(0.074943771664844, metrics.sar, places=8)
+
+
