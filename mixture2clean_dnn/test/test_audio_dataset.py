@@ -1,8 +1,11 @@
 
 import torch
 
-from utils.audio_datasets import NoisySpeechFeaturesDataset
-from utils.utilities import load_hdf5
+import sys, os
+sys.path.insert(1, os.path.join(sys.path[0], '../utils'))
+
+from audio_datasets import NoisySpeechFeaturesDataset
+from utilities import load_hdf5
 
 import unittest   # The test framework
 
@@ -51,3 +54,9 @@ class Test_TestNoisySpeechFeaturesDataset(unittest.TestCase):
             # Check mean is 0
             self.assertAlmostEqual(torch.mean(x).numpy(),0,places)
             self.assertAlmostEqual(torch.mean(y).numpy(),0,places)
+
+
+    def test_size(self):
+        ''' Test for size of output '''
+        x,y = self.dataset[1]
+        self.assertEquals(x.size[0], y.size[0])
