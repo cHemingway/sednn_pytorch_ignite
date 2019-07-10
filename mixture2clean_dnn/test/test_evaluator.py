@@ -35,7 +35,8 @@ class Test_evaluate_metrics(unittest.TestCase):
         self.assertAlmostEqual(0.693646066121670, metrics.stoi, places=4)
 
     def test_bss(self):
-        ''' Compare BSS results with MATLAB BSS_EVAL toolkit
+        ''' Compare BSS results with results from MATLAB BSS_EVAL toolkit
+        See http://bass-db.gforge.inria.fr/bss_eval/
         This is what mir_eval.seperation is designed to follow, so should be correct
         '''
         metrics = evaluator.evaluate_metrics(self.dirty_file, self.clean_file)
