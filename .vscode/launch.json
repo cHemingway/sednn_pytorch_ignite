@@ -1,0 +1,89 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "mixture_features",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/utils/prepare_data.py",
+            "args": [
+                "calculate_mixture_features",
+                "--workspace=workspace",
+                "--speech_dir=metadata/train_speech",
+                "--noise_dir=metadata/train_noise",
+                "--data_type=train",
+                "--snr=0"
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "main_ignite",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/pytorch/main_ignite.py",
+            "args": [
+                "train",
+                "--workspace=workspace",
+                "--tr_snr=0",
+                "--te_snr=0"
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "mixture_csv",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/utils/prepare_data.py",
+            "cwd": "${workspaceRoot}",
+            "args": [
+                "create_mixture_csv",
+                "--workspace=workspace",
+                "--speech_dir=metadata/train_speech",
+                "--noise_dir=metadata/train_noise",
+                "--data_type=train",
+                "--magnification=2"
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "evaluate_pesq",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/evaluate.py",
+            "args": [
+                "calculate_pesq",
+                "--workspace=workspace",
+                "--speech_dir=metadata/train_speech",
+                "--te_snr=0",
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "evaluator",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/evaluator.py",
+            "args": [
+                "--clean_dir=mini_data/test_speech",
+                "--dirty_dir=workspace/enh_wavs/test/0db",
+                "--output_file=metrics_test.csv"
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        }
+    ]
+}

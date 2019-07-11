@@ -12,7 +12,7 @@ __pycache__/
 *.prof
 
 # IDE files
-.vscode
+.vscode/tags
 
 # Project specific files
 metadata

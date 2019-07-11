@@ -1,0 +1,25 @@
+{
+    "python.linting.enabled": true,
+    "files.watcherExclude": {
+        "**/workspace/**" : true,
+        "**/workspace_full/**": true,
+        "**/metadata/**" : true
+    },
+    "files.exclude": {
+        "__pycache__": true,
+        ".pytest_cache": true,
+        ".doit*": true,
+        ".mypy_cache": true
+    },
+    "python.testing.pytestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.unittestEnabled": true,
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s", "./test",
+        "-p", "*test*.py"
+    ],
+    "python.formatting.provider": "autopep8",
+    "python.pythonPath": "/home/chris/anaconda3/envs/pytorch_sourcesep/bin/python"
+}
