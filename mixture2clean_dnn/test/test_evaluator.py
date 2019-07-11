@@ -12,9 +12,9 @@ class Test_evaluate_metrics(unittest.TestCase):
 
         our_location = os.path.dirname(__file__)
         self.clean_file = open(os.path.join(
-            our_location, "test_data/TEST_DR4_FDMS0_SX48.wav"), 'rb')
+            our_location,"test_data/clean/TEST_DR4_FDMS0_SX48.wav"), 'rb')
         self.dirty_file = open(os.path.join(
-            our_location, "test_data/TEST_DR4_FDMS0_SX48.n64.wav"), 'rb')
+            our_location,"test_data/dirty/TEST_DR4_FDMS0_SX48.n64.wav"), 'rb')
 
     def tearDown(self):
         self.clean_file.close()
