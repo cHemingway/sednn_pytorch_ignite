@@ -1,6 +1,0 @@
-init-hook="import sys,os;sys.path.insert(1, os.path.join(sys.path[0], 'utils'))"
-
-ignore=.vscode,keras,pytorch,utils,evaluate.py
-
-disable=
-    missing-docstring

@@ -1,4 +1,31 @@
-# IDE specific files
-.idea
-mixture2clean_dnn/segan_pesq_results.txt
-mixture2clean_dnn/dnn_pesq_results.txt
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Mypy
+.mypy_cache
+
+# Pytest
+.pytest_cache
+
+# Profiles
+*.prof
+
+# IDE files
+.vscode
+
+# Project specific files
+metadata
+workspace
+workspace_full
+_pesq_itu_results.txt
+_pesq_results.txt
+# PESQ executable, license prohibits upload
+pesq
+
+# Specific files generated, should be in workspace really
+mini_data/test_speech/TEST_DR5_MRJM3_SI1809.wav
+mini_data/test_speech/TEST_DR4_FDMS0_SX48.wav
+
+#doit database
+.doit*
