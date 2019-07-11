@@ -50,3 +50,14 @@ class Test_evaluate_metrics(unittest.TestCase):
         self.assertAlmostEqual(0.074943771664844, metrics.sar, places=8)
 
 
+class Test_compare_folder(unittest.TestCase):
+
+    def setUp(self):
+        our_location = os.path.dirname(__file__)
+        self.clean_folder = os.path.join(our_location,"test_data/clean/")
+        self.dirty_folder = os.path.join(our_location,"test_data/dirty/")
+
+    def test_compare(self):
+        metrics = evaluator.compare_folder(self.clean_folder, self.dirty_folder)
+        self.assertIsInstance(metrics, dict)
+        self.assertEqual(len(metrics), 4) # Should be 4 files in folder
