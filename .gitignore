@@ -13,6 +13,7 @@ __pycache__/
 
 # IDE files
 .vscode/tags
+.idea/workspace.xml
 
 # Project specific files
 metadata
