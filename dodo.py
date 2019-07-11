@@ -401,6 +401,17 @@ def task_calculate_bss_stoi():
     }
 
 
+def task_backup_results():
+    ''' Save results into .tar.gz with current date/time whenever changed '''
+    return {
+        'file_dep': task_calculate_bss_stoi()['targets'] +
+                    task_calculate_pesq()['targets'],
+        'targets': [f'{RESULT_DIR}/previous'],
+
+        'actions': [f"bash backup_results.sh {RESULT_DIR}"]
+    }
+
+
 def task_get_stats():
     ''' Calculate overall stats '''
     return {
