@@ -60,6 +60,7 @@ BACKEND = get_var('backend', "pytorch")
 ITERATION = get_var('iteration', 10000)
 
 DATA = {}
+RESULT_DIR = ""
 if CONFIG["fulldata"]:
     DATA = {
         "train": {
@@ -71,6 +72,7 @@ if CONFIG["fulldata"]:
             "noise":  "metadata/test_noise",
         }
     }
+    RESULT_DIR = "results/metadata"
 else:
     DATA = {
         "train": {
@@ -82,6 +84,7 @@ else:
             "noise":  "mini_data/test_noise",
         }
     }
+    RESULT_DIR = "results/mini_data"
 
 # Set tensorflow log level
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
@@ -356,7 +359,7 @@ def task_calculate_pesq():
                 f"--workspace={CONFIG['workspace']} "
                 f"--speech_dir={DATA['test']['speech']} --te_snr={CONFIG['test_snr']} "
             ),
-            "mv _pesq_results.txt dnn_pesq_results.txt",
+            f"mv _pesq_results.txt {RESULT_DIR}/dnn_pesq_results.txt",
             # Evaluate SEGAN
             Interactive(
                 f"python evaluate_pesq.py calculate_pesq "
@@ -365,7 +368,7 @@ def task_calculate_pesq():
                 f"--enh_speech_dir={SEGAN_OUTPUT_FOLDER} "
                 f"--te_snr={CONFIG['test_snr']} "
             ),
-            "mv _pesq_results.txt segan_pesq_results.txt",
+            f"mv _pesq_results.txt {RESULT_DIR}/segan_pesq_results.txt",
             # Cleanup
             "rm _pesq_itu_results.txt"
         ],
@@ -376,7 +379,7 @@ def task_calculate_bss_stoi():
     ''' Calculate bss and stoi of all enhanced speech '''
     return {
         'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
-        'targets': ['dnn_bss_stoi.csv', 'segan_bss_stoi.csv'],
+        'targets': [f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
         'actions': [
             # Evaluate PESQ
             Interactive(
@@ -384,7 +387,7 @@ def task_calculate_bss_stoi():
                 f"-q " # Hide warnings
                 f"--clean_dir={DATA['test']['speech']} "
                 f"--dirty_dir={ENH_WAVS_DIR} "
-                f"--output_file=dnn_bss_stoi.csv"
+                f"--output_file={RESULT_DIR}/dnn_bss_stoi.csv"
             ),
             # Evaluate SEGAN
             Interactive(
@@ -392,7 +395,7 @@ def task_calculate_bss_stoi():
                 f"-q "
                 f"--clean_dir={DATA['test']['speech']} "
                 f"--dirty_dir={SEGAN_OUTPUT_FOLDER} "
-                f"--output_file=segan_bss_stoi.csv"
+                f"--output_file={RESULT_DIR}/segan_bss_stoi.csv"
             ),
         ],
     }
@@ -405,9 +408,9 @@ def task_get_stats():
         'actions': [
             Interactive("echo No BSS Yet!"),
             Interactive("echo DNN ------------------"),
-            Interactive("python evaluate_pesq.py get_stats --pesq_path=dnn_pesq_results.txt"),
+            Interactive(f"python evaluate_pesq.py get_stats --pesq_path={RESULT_DIR}/dnn_pesq_results.txt"),
             Interactive("echo SEGAN+  -------------"),
-            Interactive("python evaluate_pesq.py get_stats --pesq_path=segan_pesq_results.txt")
+            Interactive(f"python evaluate_pesq.py get_stats --pesq_path={RESULT_DIR}/segan_pesq_results.txt")
         ],
         
         'uptodate': [False]  # Always run this
