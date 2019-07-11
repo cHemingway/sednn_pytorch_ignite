@@ -371,12 +371,39 @@ def task_calculate_pesq():
         ],
     }
 
+@create_after(executed='inference')
+def task_calculate_bss_stoi():
+    ''' Calculate bss and stoi of all enhanced speech '''
+    return {
+        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
+        'targets': ['dnn_bss_stoi.csv', 'segan_bss_stoi.csv'],
+        'actions': [
+            # Evaluate PESQ
+            Interactive(
+                f"python evaluator.py "
+                f"-q " # Hide warnings
+                f"--clean_dir={DATA['test']['speech']} "
+                f"--dirty_dir={ENH_WAVS_DIR} "
+                f"--output_file=dnn_bss_stoi.csv"
+            ),
+            # Evaluate SEGAN
+            Interactive(
+                f"python evaluator.py "
+                f"-q "
+                f"--clean_dir={DATA['test']['speech']} "
+                f"--dirty_dir={SEGAN_OUTPUT_FOLDER} "
+                f"--output_file=segan_bss_stoi.csv"
+            ),
+        ],
+    }
+
 
 def task_get_stats():
     ''' Calculate overall stats '''
     return {
         'file_dep': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
         'actions': [
+            Interactive("echo No BSS Yet!"),
             Interactive("echo DNN ------------------"),
             Interactive("python evaluate_pesq.py get_stats --pesq_path=dnn_pesq_results.txt"),
             Interactive("echo SEGAN+  -------------"),
