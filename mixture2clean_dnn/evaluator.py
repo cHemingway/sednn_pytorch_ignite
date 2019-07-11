@@ -7,6 +7,7 @@ import pathlib
 import typing
 from typing import Union
 from dataclasses import dataclass
+import logging
 
 from tqdm import tqdm  # type: ignore
 import soundfile  # type: ignore
@@ -46,6 +47,16 @@ def evaluate_metrics(dirty_file: Union[str, typing.BinaryIO],
 
     if (dirty.ndim > 1) or (clean.ndim > 1):
         raise ValueError("Files are not mono!")
+
+    # HACK: Reduce length
+    if len(dirty) > len(clean):
+        logging.warning("File %s is different length %d from clean file %d",
+                dirty_file, len(dirty), len(clean))
+        dirty = dirty[:len(clean)]
+    elif len(clean) > len(dirty):
+        logging.warning("File %s is different length %d from clean file %d",
+                dirty_file, len(dirty), len(clean))
+        clean = clean[:len(dirty)]
 
     # Calculate STOI, original version
     d = stoi(clean, dirty, dirty_fs, extended=False)
