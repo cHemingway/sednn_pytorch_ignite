@@ -352,14 +352,14 @@ def task_calculate_pesq():
         'actions': [
             # Evaluate PESQ
             Interactive(
-                f"python evaluate.py calculate_pesq "
+                f"python evaluate_pesq.py calculate_pesq "
                 f"--workspace={CONFIG['workspace']} "
                 f"--speech_dir={DATA['test']['speech']} --te_snr={CONFIG['test_snr']} "
             ),
             "mv _pesq_results.txt dnn_pesq_results.txt",
             # Evaluate SEGAN
             Interactive(
-                f"python evaluate.py calculate_pesq "
+                f"python evaluate_pesq.py calculate_pesq "
                 f"--workspace={CONFIG['workspace']} "
                 f"--speech_dir={DATA['test']['speech']} "
                 f"--enh_speech_dir={SEGAN_OUTPUT_FOLDER} "
@@ -378,9 +378,9 @@ def task_get_stats():
         'file_dep': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
         'actions': [
             Interactive("echo DNN ------------------"),
-            Interactive("python evaluate.py get_stats --pesq_path=dnn_pesq_results.txt"),
+            Interactive("python evaluate_pesq.py get_stats --pesq_path=dnn_pesq_results.txt"),
             Interactive("echo SEGAN+  -------------"),
-            Interactive("python evaluate.py get_stats --pesq_path=segan_pesq_results.txt")
+            Interactive("python evaluate_pesq.py get_stats --pesq_path=segan_pesq_results.txt")
         ],
         
         'uptodate': [False]  # Always run this
