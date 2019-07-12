@@ -417,11 +417,10 @@ def task_get_stats():
     return {
         'file_dep': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
         'actions': [
-            Interactive("echo No BSS Yet!"),
             Interactive("echo DNN ------------------"),
-            Interactive(f"python evaluate_pesq.py get_stats --pesq_path={RESULT_DIR}/dnn_pesq_results.txt"),
+            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv --pesq_file={RESULT_DIR}/dnn_pesq_results.txt"),
             Interactive("echo SEGAN+  -------------"),
-            Interactive(f"python evaluate_pesq.py get_stats --pesq_path={RESULT_DIR}/segan_pesq_results.txt")
+            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv --pesq_file={RESULT_DIR}/segan_pesq_results.txt"),
         ],
         
         'uptodate': [False]  # Always run this

@@ -84,6 +84,18 @@
             ],
             "redirectOutput": false,
             "console": "integratedTerminal"
+        },
+        {
+            "name": "show_stats",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/show_stats.py",
+            "args": [
+                "--csv_file=results/metadata/segan_bss_stoi.csv",
+                "--pesq_file=results/metadata/segan_pesq_results.txt",
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
         }
     ]
 }

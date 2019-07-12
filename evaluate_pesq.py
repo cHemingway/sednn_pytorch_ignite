@@ -2,8 +2,9 @@
 Summary:  Calculate PESQ and overal stats of enhanced speech. 
 Author:   Qiuqiang Kong
 Created:  2017.12.22
-Modified: 2019.06.26
+Modified: 2019.07.12 - Removed get_stats
 """
+import sys
 import argparse
 import os
 import subprocess
@@ -50,43 +51,6 @@ def calculate_pesq(args):
         # Call executable PESQ tool, hiding output
         cmd = ' '.join(['./pesq', speech_path, enh_path, '+16000'])
         subprocess.call(cmd, stdout=subprocess.DEVNULL, shell=True)   
-        
-        
-def get_stats(args):
-    """Calculate stats of PESQ. 
-    """
-    pesq_path = args.pesq_path
-    if not pesq_path:
-        pesq_path = '_pesq_results.txt'
-    
-    with open(pesq_path, 'r') as f:
-        reader = csv.reader(f, delimiter='\t')
-        lis = list(reader)
-        
-    pesq_dict = {}
-    for i1 in range(1, len(lis) - 1):
-        li = lis[i1]
-        na = li[0]
-        pesq = float(li[1])
-        noise_type = na.split('.')[1]
-        if noise_type not in pesq_dict.keys():
-            pesq_dict[noise_type] = [pesq]
-        else:
-            pesq_dict[noise_type].append(pesq)
-        
-    avg_list, std_list = [], []
-    f = '{0:<16} {1:<16}'
-    print(f.format('Noise', 'PESQ'))
-    print('---------------------------------')
-    for noise_type in pesq_dict.keys():
-        pesqs = pesq_dict[noise_type]
-        avg_pesq = np.mean(pesqs)
-        std_pesq = np.std(pesqs)
-        avg_list.append(avg_pesq)
-        std_list.append(std_pesq)
-        print(f.format(noise_type, '{:.2f} +- {:.2f}'.format(avg_pesq, std_pesq)))
-    print('---------------------------------')
-    print(f.format('Avg.', '{:.2f} +- {:.2f}'.format(np.mean(avg_list), np.mean(std_list))))
 
 
 if __name__ == '__main__':
@@ -99,17 +63,13 @@ if __name__ == '__main__':
     parser_calculate_pesq.add_argument('--enh_speech_dir', type=str, default=None)
     parser_calculate_pesq.add_argument('--te_snr', type=float, required=True)
     parser_calculate_pesq.add_argument('--show_names',action='store_true',default=False)
-    
-    parser_get_stats = subparsers.add_parser('get_stats')
-    parser_get_stats.add_argument('--pesq_path',type=str, default=None)
-    
     args = parser.parse_args()
         
     if args.mode == 'calculate_pesq':
         calculate_pesq(args)
         
     elif args.mode == 'get_stats':
-        get_stats(args)
+        sys.exit('get_stats has been removed')
         
     else:
         raise Exception('Incorrect argument!')
