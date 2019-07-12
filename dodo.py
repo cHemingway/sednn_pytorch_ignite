@@ -351,7 +351,7 @@ def task_calculate_pesq():
     ''' Calculate PESQ of all enhanced speech '''
     return {
         'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
-        'targets': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
+        'targets': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt'],
         'actions': [
             # Evaluate PESQ
             Interactive(
@@ -401,21 +401,40 @@ def task_calculate_bss_stoi():
     }
 
 
+def task_plot():
+    ''' Generate plots for all data'''
+    return {
+        'file_dep': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt',
+                    f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
+        'targets': [f'{RESULT_DIR}/segan_plot.png', f'{RESULT_DIR}/dnn_plot.png'],
+        'actions': [
+            f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv "
+                f"--pesq_file={RESULT_DIR}/dnn_pesq_results.txt "
+                f"--plot_file={RESULT_DIR}/dnn_plot.png",
+            f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv "
+                f"--pesq_file={RESULT_DIR}/segan_pesq_results.txt "
+                f"--plot_file={RESULT_DIR}/segan_plot.png"
+        ],
+    }
+
 def task_backup_results():
     ''' Save results into .tar.gz with current date/time whenever changed '''
     return {
         'file_dep': task_calculate_bss_stoi()['targets'] +
-                    task_calculate_pesq()['targets'],
+                    task_calculate_pesq()['targets'] +
+                    task_plot()['targets'],
         'targets': [f'{RESULT_DIR}/previous'],
 
         'actions': [f"bash backup_results.sh {RESULT_DIR}"]
     }
 
 
+
 def task_get_stats():
     ''' Calculate overall stats '''
     return {
-        'file_dep': ['dnn_pesq_results.txt', 'segan_pesq_results.txt'],
+        'file_dep': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt',
+                    f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
         'actions': [
             Interactive("echo DNN ------------------"),
             Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv --pesq_file={RESULT_DIR}/dnn_pesq_results.txt"),
