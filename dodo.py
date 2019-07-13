@@ -309,6 +309,22 @@ def task_train():
         )],
     }
 
+
+def task_train_segan():
+    ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
+    return {
+        'file_dep': PACKED_FEATURE_PATHS,  # TODO Depend on SEGAN Code
+        'targets': [f"{RESULT_DIR}/ckpt_segan+"],
+        'actions': [Interactive(
+            f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
+            f"--save_path {RESULT_DIR}/ckpt_segan+ "
+            f"--clean_trainset {DATA['train']['speech']} "
+            f"--noisy_trainset {MIXED_WAVS_DIR}/train/{CONFIG['train_snr']}db "
+            f"--cache_dir {CONFIG['workspace']}/segan_tmp "
+            f"--no_train_gen --batch_size 300 --no_bias"
+        )]
+    }
+
 @create_after(executed='calculate_mixture_features', target_regex='*.wav')
 def task_inference():
     mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
