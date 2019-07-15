@@ -40,7 +40,14 @@ def main(args):
         dirty_name = random.choice(dirty_names)
         # Generate name of symlink and point it to
         output_name = output_dir / (basename+"_noisy.wav")
-        output_name = output_name.resolve() # Make absolute
+        # Make absolute, as pathlib.Path().absolute is deprecated
+        # See https://bugs.python.org/issue29688
+        output_name = os.path.abspath(output_name)
+        output_name = pathlib.Path(output_name)
+        # Delete old output name
+        if output_name.is_symlink():
+            output_name.unlink()
+        # Finally, symlink
         output_name.symlink_to(dirty_name.resolve()) # Symlink to absolute path 
 
 
