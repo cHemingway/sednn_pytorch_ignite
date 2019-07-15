@@ -36,6 +36,8 @@ CONFIG["workspace"] = pathlib.Path(
             "workspace_full" if CONFIG["fulldata"] else "workspace")
 )
 
+RESULT_DIR = get_var("result_dir","results")
+
 # Use different doit database for full and partial data
 DOIT_CONFIG = {
     'dep_file': '.doit{}.db'.format('_fulldata' if CONFIG['fulldata'] else '')
@@ -52,7 +54,9 @@ SEGAN_CONFIG = {
 
 # Cannot use "+" in folder due to PESQ limitations
 SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan"
-
+SEGAN_TRAIN_FOLDER = CONFIG['workspace'] / "segan_train_data"
+SEGAN_TMP_FOLDER = CONFIG['workspace'] / "segan_tmp"
+SEGAN_CKPT_DIR = f"{RESULT_DIR}/ckpt_segan+"
 
 # Keep backend out of CONFIG so can calculate without needing new features
 BACKEND = get_var('backend', "pytorch")
@@ -60,7 +64,6 @@ BACKEND = get_var('backend', "pytorch")
 ITERATION = get_var('iteration', 10000)
 
 DATA = {}
-RESULT_DIR = get_var("result_dir","results")
 if CONFIG["fulldata"]:
     DATA = {
         "train": {
@@ -204,6 +207,14 @@ def delete_workspace():
     except FileNotFoundError:
         pass # Already been deleted
 
+def delete_segan_train():
+    ''' Utility function to delete workspace at end '''
+    for f in [SEGAN_CKPT_DIR, SEGAN_TMP_FOLDER]:
+        try:
+            shutil.rmtree(f) 
+        except FileNotFoundError:
+            pass # Already been deleted
+
 #
 # The actual tasks themselves
 #
@@ -299,7 +310,7 @@ def task_write_out_scalar():
 def task_prepare_segan_data():
     return {
         'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
-        'targets': [f"{CONFIG['workspace']}/segan_train_data"],
+        'targets': [SEGAN_TRAIN_FOLDER],
         'actions': [Interactive(
             "python ./prepare_segan_data.py "
             f"--clean_dir={DATA['train']['speech']} "
@@ -332,18 +343,19 @@ def task_train_segan():
     else:
         save_freq = 500
     return {
-        'file_dep': PACKED_FEATURE_PATHS,  # TODO Depend on SEGAN Code
-        'targets': [f"{RESULT_DIR}/ckpt_segan+"],
+        'file_dep': [SEGAN_TRAIN_FOLDER], # TODO depend on SEGAN code
+        'targets': [SEGAN_CKPT_DIR, SEGAN_TMP_FOLDER],
         'title': title_with_actions,
         'actions': [Interactive(
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
-            f"--save_path {RESULT_DIR}/ckpt_segan+ "
+            f"--save_path {SEGAN_CKPT_DIR} "
             f"--save_freq {save_freq} "
             f"--clean_trainset {DATA['train']['speech']} "
-            f"--noisy_trainset {CONFIG['workspace']}/segan_train_data "
-            f"--cache_dir {CONFIG['workspace']}/segan_tmp "
+            f"--noisy_trainset {SEGAN_TRAIN_FOLDER} "
+            f"--cache_dir {SEGAN_TMP_FOLDER} "
             f"--no_train_gen --batch_size 300 --no_bias"
-        )]
+        )],
+        'clean': [delete_segan_train]
     }
 
 @create_after(executed='calculate_mixture_features', target_regex='*.wav')
@@ -368,15 +380,15 @@ def task_segan_inference():
     mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
     return {
         # TODO Add model checkpoint and configuration to build
-        'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']),
+        'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']) + [SEGAN_CKPT_DIR],
         'targets': [
             SEGAN_OUTPUT_FOLDER
         ],
         'actions': [Interactive(
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'clean.py'} "
-            f"--g_pretrained_ckpt {SEGAN_CONFIG['path']/'ckpt_segan+/segan+_generator.ckpt'} "
+            f"--g_pretrained_ckpt {SEGAN_CKPT_DIR/'segan+_generator.ckpt'} "
             f"--test_files {CONFIG['workspace']/ 'mixed_audios/test' / str(CONFIG['test_snr'])}db "
-            f"--cfg_file {SEGAN_CONFIG['path']/'ckpt_segan+/train.opts'} "
+            f"--cfg_file {SEGAN_CKPT_DIR/'train.opts'} "
             f"--synthesis_path {SEGAN_OUTPUT_FOLDER} " #TODO move into workspace
             f"--soundfile" # Use libsoundfile backend to save
         )]
