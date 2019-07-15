@@ -353,7 +353,8 @@ def task_train_segan():
             f"--clean_trainset {DATA['train']['speech']} "
             f"--noisy_trainset {SEGAN_TRAIN_FOLDER} "
             f"--cache_dir {SEGAN_TMP_FOLDER} "
-            f"--no_train_gen --batch_size 300 --no_bias"
+            f"--no_train_gen --batch_size 300 --no_bias "
+            f"--slice_workers=4" # Use multiple workers
         )],
         'clean': [delete_segan_train]
     }
