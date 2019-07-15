@@ -36,7 +36,7 @@ CONFIG["workspace"] = pathlib.Path(
             "workspace_full" if CONFIG["fulldata"] else "workspace")
 )
 
-RESULT_DIR = get_var("result_dir","results")
+RESULT_DIR = pathlib.Path(get_var("result_dir","results"))
 
 # Use different doit database for full and partial data
 DOIT_CONFIG = {
@@ -56,7 +56,7 @@ SEGAN_CONFIG = {
 SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan"
 SEGAN_TRAIN_FOLDER = CONFIG['workspace'] / "segan_train_data"
 SEGAN_TMP_FOLDER = CONFIG['workspace'] / "segan_tmp"
-SEGAN_CKPT_DIR = f"{RESULT_DIR}/ckpt_segan+"
+SEGAN_CKPT_DIR = RESULT_DIR/"ckpt_segan+"
 
 # Keep backend out of CONFIG so can calculate without needing new features
 BACKEND = get_var('backend', "pytorch")
@@ -75,7 +75,7 @@ if CONFIG["fulldata"]:
             "noise":  "metadata/test_noise",
         }
     }
-    RESULT_DIR += "/metadata"
+    RESULT_DIR = RESULT_DIR / "metadata"
 else:
     DATA = {
         "train": {
@@ -87,7 +87,7 @@ else:
             "noise":  "mini_data/test_noise",
         }
     }
-    RESULT_DIR += "/mini_data"
+    RESULT_DIR = RESULT_DIR / "mini_data"
 
 # Set tensorflow log level
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
