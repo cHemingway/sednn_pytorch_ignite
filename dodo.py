@@ -18,7 +18,7 @@ sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 #pylint: disable=wrong-import-position
 from utils import prepare_data
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
-                        create_folder, run_once)
+                        create_folder, run_once, title_with_actions)
 from doit import get_var, create_after
 
 CONFIG = {
@@ -60,7 +60,7 @@ BACKEND = get_var('backend', "pytorch")
 ITERATION = get_var('iteration', 10000)
 
 DATA = {}
-RESULT_DIR = ""
+RESULT_DIR = get_var("result_dir","results")
 if CONFIG["fulldata"]:
     DATA = {
         "train": {
@@ -72,7 +72,7 @@ if CONFIG["fulldata"]:
             "noise":  "metadata/test_noise",
         }
     }
-    RESULT_DIR = "results/metadata"
+    RESULT_DIR += "/metadata"
 else:
     DATA = {
         "train": {
@@ -84,7 +84,7 @@ else:
             "noise":  "mini_data/test_noise",
         }
     }
-    RESULT_DIR = "results/mini_data"
+    RESULT_DIR += "/mini_data"
 
 # Set tensorflow log level
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
@@ -295,6 +295,19 @@ def task_write_out_scalar():
         'clean': True,
     }
 
+@create_after(executed='calculate_mixture_features')
+def task_prepare_segan_data():
+    return {
+        'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
+        'targets': [f"{CONFIG['workspace']}/segan_train_data"],
+        'actions': [Interactive(
+            "python ./prepare_segan_data.py "
+            f"--clean_dir={DATA['train']['speech']} "
+            f"--noisy_dir={MIXED_WAVS_DIR}/train/{CONFIG['train_snr']}db "
+            f"--output_dir=%(targets)s "
+        )]
+    }
+
 
 def task_train():
     return {
@@ -310,16 +323,24 @@ def task_train():
     }
 
 
+@create_after(executed='prepare_segan_data')
 def task_train_segan():
     ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
+
+    if CONFIG["fulldata"]:
+        save_freq = 50
+    else:
+        save_freq = 500
     return {
         'file_dep': PACKED_FEATURE_PATHS,  # TODO Depend on SEGAN Code
         'targets': [f"{RESULT_DIR}/ckpt_segan+"],
+        'title': title_with_actions,
         'actions': [Interactive(
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
             f"--save_path {RESULT_DIR}/ckpt_segan+ "
+            f"--save_freq {save_freq} "
             f"--clean_trainset {DATA['train']['speech']} "
-            f"--noisy_trainset {MIXED_WAVS_DIR}/train/{CONFIG['train_snr']}db "
+            f"--noisy_trainset {CONFIG['workspace']}/segan_train_data "
             f"--cache_dir {CONFIG['workspace']}/segan_tmp "
             f"--no_train_gen --batch_size 300 --no_bias"
         )]
