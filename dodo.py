@@ -354,6 +354,7 @@ def task_train_segan():
             f"--noisy_trainset {SEGAN_TRAIN_FOLDER} "
             f"--cache_dir {SEGAN_TMP_FOLDER} "
             f"--no_train_gen --batch_size 300 --no_bias "
+            f"--max_samples=20 " # Limit number of samples to decrease RAM
             f"--slice_workers=4" # Use multiple workers
         )],
         'clean': [delete_segan_train]
