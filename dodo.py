@@ -49,7 +49,9 @@ SEGAN_CONFIG = {
     "path":   pathlib.Path(get_var('segan_path', '/home/chris/repos/segan_pytorch')),
     # HACK: Hardcode path for python EXE needed for SEGAN
     # _should_ use conda run instead, but breaks for some reason, not sure why
-    'python': "/home/chris/anaconda3/envs/segan_pytorch/bin/python"
+    'python': "/home/chris/anaconda3/envs/segan_pytorch/bin/python",
+    'num_samples': get_var('segan_samples',40),
+    'batch_size': get_var('segan_batch_size',25)
 }
 
 # Cannot use "+" in folder due to PESQ limitations
@@ -306,7 +308,7 @@ def task_write_out_scalar():
         'clean': True,
     }
 
-@create_after(executed='calculate_mixture_features')
+@create_after(executed='calculate_mixture_features',target_regex="*.wav")
 def task_prepare_segan_data():
     return {
         'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
@@ -334,7 +336,7 @@ def task_train():
     }
 
 
-@create_after(executed='prepare_segan_data')
+@create_after(executed='prepare_segan_data',target_regex=".*.ckpt .*.opts *checkpoints")
 def task_train_segan():
     ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
 
@@ -343,8 +345,10 @@ def task_train_segan():
     else:
         save_freq = 500
     return {
-        'file_dep': [SEGAN_TRAIN_FOLDER], # TODO depend on SEGAN code
-        'targets': [SEGAN_CKPT_DIR, SEGAN_TMP_FOLDER],
+        'file_dep': list(SEGAN_TRAIN_FOLDER.rglob("*.wav")), # TODO depend on SEGAN code
+        'targets': [SEGAN_CKPT_DIR/'EOE_D-checkpoints', 
+                    SEGAN_CKPT_DIR/'EOE_G-checkpoints',
+                    SEGAN_CKPT_DIR/'train.opts'], # TODO add .ckpt file itself
         'title': title_with_actions,
         'actions': [Interactive(
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
@@ -353,10 +357,13 @@ def task_train_segan():
             f"--clean_trainset {DATA['train']['speech']} "
             f"--noisy_trainset {SEGAN_TRAIN_FOLDER} "
             f"--cache_dir {SEGAN_TMP_FOLDER} "
-            f"--no_train_gen --batch_size 300 --no_bias "
-            f"--max_samples=20 " # Limit number of samples to decrease RAM
+            f"--no_train_gen "
+            f"--batch_size {SEGAN_CONFIG['batch_size']} "
+            f"--no_bias "
+            f"--max_samples={SEGAN_CONFIG['num_samples']} " # Limit number of samples to decrease RAM
             f"--slice_workers=4" # Use multiple workers
         )],
+        'uptodate': [config_changed(SEGAN_CONFIG)],
         'clean': [delete_segan_train]
     }
 
@@ -381,19 +388,23 @@ def task_inference():
 def task_segan_inference():
     mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
     return {
-        # TODO Add model checkpoint and configuration to build
-        'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']) + [SEGAN_CKPT_DIR],
+        # TODO Use latest checkpoint
+        'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']) + [
+            SEGAN_CKPT_DIR/'weights_EOE_G-Generator-101.ckpt',
+            SEGAN_CKPT_DIR/'train.opts'
+            ],
         'targets': [
-            SEGAN_OUTPUT_FOLDER
+            SEGAN_OUTPUT_FOLDER,
         ],
         'actions': [Interactive(
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'clean.py'} "
-            f"--g_pretrained_ckpt {SEGAN_CKPT_DIR/'segan+_generator.ckpt'} "
+            f"--g_pretrained_ckpt {SEGAN_CKPT_DIR/'weights_EOE_G-Generator-101.ckpt'} "
             f"--test_files {CONFIG['workspace']/ 'mixed_audios/test' / str(CONFIG['test_snr'])}db "
             f"--cfg_file {SEGAN_CKPT_DIR/'train.opts'} "
             f"--synthesis_path {SEGAN_OUTPUT_FOLDER} " #TODO move into workspace
             f"--soundfile" # Use libsoundfile backend to save
-        )]
+        )],
+        'uptodate': [config_changed(SEGAN_CONFIG)],
     }
 
 
