@@ -509,8 +509,12 @@ def task_backup_results():
                     task_calculate_pesq()['targets'] +
                     task_plot()['targets'],
         'targets': [f'{RESULT_DIR}/previous'],
-
-        'actions': [f"bash backup_results.sh {RESULT_DIR}"]
+        'actions': [
+            # Remove older SEGAN checkpoints to save ~1GB of disk!
+            f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}", 
+            # Backup everything else in results dir
+            f"bash backup_results.sh {RESULT_DIR}"
+        ]
     }
 
 
