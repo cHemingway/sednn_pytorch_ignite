@@ -323,7 +323,7 @@ def task_write_out_scalar():
         'clean': True,
     }
 
-@create_after(executed='calculate_mixture_features',target_regex="*.wav")
+@create_after(executed='calculate_mixture_features',target_regex=".*.wav")
 def task_prepare_segan_data():
     return {
         'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
@@ -410,7 +410,13 @@ def task_inference():
 @create_after(executed='train_segan', target_regex='*.wav')
 def task_segan_inference():
     mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
-    segan_latest_ckpt = segan_get_checkpoint(SEGAN_CKPT_DIR)
+    try:
+        segan_latest_ckpt = segan_get_checkpoint(SEGAN_CKPT_DIR)
+    except FileNotFoundError: 
+        # File is probably not found as we don't have training data yet
+        # Despite using create_after, this can happen when we call doit clean
+        # The action should not actually be called, so its OK
+        segan_latest_ckpt = "ERROR NOT TRAINED"
     return {
         'file_dep': mixed + get_source_files(SEGAN_CONFIG['path']) + [
             SEGAN_CKPT_DIR/'EOE_G-checkpoints',
