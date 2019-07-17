@@ -373,6 +373,7 @@ def task_train_segan():
                     SEGAN_CKPT_DIR/'train.opts'], # TODO add .ckpt file itself
         'title': title_with_actions,
         'actions': [Interactive(
+            f"time -p " # Get training time
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
             f"--save_path {SEGAN_CKPT_DIR} "
             f"--save_freq {save_freq} "
