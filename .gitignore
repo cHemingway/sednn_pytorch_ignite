@@ -30,3 +30,4 @@ mini_data/test_speech/TEST_DR4_FDMS0_SX48.wav
 
 #doit database
 .doit*
+tasks.dot
