@@ -37,7 +37,7 @@ CONFIG["workspace"] = pathlib.Path(
             "workspace_full" if CONFIG["fulldata"] else "workspace")
 )
 
-RESULT_DIR = pathlib.Path(get_var("result_dir","results"))
+RESULT_DIR = pathlib.Path(get_var("result_dir","/mnt/Spare/Project/results"))
 
 # Use different doit database for full and partial data
 DOIT_CONFIG = {
@@ -239,7 +239,6 @@ def task_make_workspace():
     ''' Create workspace folder if needed '''
     return {
         'targets': [CONFIG["workspace"]],
-        'uptodate': [run_once],
         'actions': [
             (create_folder, [CONFIG["workspace"]]),
             (create_folder, [SEGAN_OUTPUT_FOLDER])
@@ -252,6 +251,7 @@ def task_make_workspace():
 def task_create_mixture_csv():
     return {
         'file_dep':  DATA_FILES + get_source_files("utils"),
+        'task_dep': ['make_workspace'],
         # Using pathlib slash '/' operator
         'targets': [
             CONFIG["workspace"] / 'mixture_csvs' / 'test.csv',
@@ -297,6 +297,7 @@ def task_pack_features():
 
     return {
         'file_dep': features + get_source_files("utils"), 
+        'task_dep': ['calculate_mixture_features'],
         'targets': PACKED_FEATURE_PATHS,
         'actions': [
             PythonInteractiveAction(
@@ -327,6 +328,7 @@ def task_write_out_scalar():
 def task_prepare_segan_data():
     return {
         'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
+        'task_dep': ['calculate_mixture_features'],
         'targets': [SEGAN_TRAIN_FOLDER],
         'actions': [Interactive(
             "python ./prepare_segan_data.py "
@@ -351,7 +353,7 @@ def task_train():
     }
 
 
-@create_after(executed='prepare_segan_data',target_regex=".*.ckpt .*.opts *checkpoints")
+@create_after(executed='prepare_segan_data',target_regex=".*.")
 def task_train_segan():
     ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
     if CONFIG["fulldata"]:
@@ -367,7 +369,9 @@ def task_train_segan():
         samples_config_str = " "
 
     return {
-        'file_dep': list(SEGAN_TRAIN_FOLDER.rglob("*.wav")), # TODO depend on SEGAN code
+        'file_dep': list(SEGAN_TRAIN_FOLDER.rglob("*.wav")) + \
+                    get_source_files(SEGAN_CONFIG['path']),  # Depend on SEGAN source files
+        'task_dep': ['prepare_segan_data'],
         'targets': [SEGAN_CKPT_DIR/'EOE_D-checkpoints', 
                     SEGAN_CKPT_DIR/'EOE_G-checkpoints',
                     SEGAN_CKPT_DIR/'train.opts'], # TODO add .ckpt file itself
@@ -395,6 +399,7 @@ def task_inference():
     mixed = list(MIXED_WAVS_DIR.rglob('*.wav'))
     return {
         'file_dep': mixed + get_source_files(BACKEND), # TODO Add checkpoint
+        'task_dep': ['train'],
         'targets': [
             ENH_WAVS_DIR
         ],
@@ -438,11 +443,10 @@ def task_segan_inference():
     }
 
 
-@create_after(executed='inference')
 def task_calculate_pesq():
     ''' Calculate PESQ of all enhanced speech '''
     return {
-        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
+        'task_dep': ['inference', 'segan_inference'],
         'targets': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt'],
         'actions': [
             # Evaluate PESQ
@@ -466,11 +470,11 @@ def task_calculate_pesq():
         ],
     }
 
-@create_after(executed='inference')
+
 def task_calculate_bss_stoi():
     ''' Calculate bss and stoi of all enhanced speech '''
     return {
-        'file_dep': list(ENH_WAVS_DIR.rglob("*.enh.wav")) + list(SEGAN_OUTPUT_FOLDER.rglob("*.wav")),
+        'task_dep': ['inference', 'segan_inference'],
         'targets': [f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
         'actions': [
             # Evaluate PESQ
@@ -496,8 +500,7 @@ def task_calculate_bss_stoi():
 def task_plot():
     ''' Generate plots for all data'''
     return {
-        'file_dep': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt',
-                    f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
+        'task_dep' : ['calculate_bss_stoi', 'calculate_pesq'],
         'targets': [f'{RESULT_DIR}/segan_plot.png', f'{RESULT_DIR}/dnn_plot.png'],
         'actions': [
             f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv "
@@ -509,12 +512,11 @@ def task_plot():
         ],
     }
 
+
 def task_backup_results():
     ''' Save results into .tar.gz with current date/time whenever changed '''
     return {
-        'file_dep': task_calculate_bss_stoi()['targets'] +
-                    task_calculate_pesq()['targets'] +
-                    task_plot()['targets'],
+        'task_dep': ['plot'],
         'targets': [f'{RESULT_DIR}/previous'],
         'actions': [
             # Remove older SEGAN checkpoints to save ~1GB of disk!
