@@ -232,6 +232,31 @@ def segan_get_checkpoint(ckpt_dir: pathlib.Path) -> pathlib.Path:
             raise ValueError("Could not find current checkpoint in file")
     return ckpt_dir / ('weights_' + current_file) # Add 'weights_' prefix
 
+
+def copy_sample_files(noisy_dir: pathlib.Path, enhanced_dir: pathlib.Path,
+                      out_dir: pathlib.Path, max_n=10) ->  None:
+    ''' Copy up to max_n noisy/enhanced files to result_dir '''
+    def copy_n_wavs(src,dst,max_n):
+        ''' Helper function, copies n in alphabetical order '''
+        wav_names = list(src.glob("*.wav"))
+        wav_names.sort() # Sort in place so get same each time
+        for n,f in enumerate(wav_names):
+            if n>max_n:
+                break
+            shutil.copy(str(f),str(dst))
+  
+    # Dictionary names
+    out_noisy = out_dir / 'noisy'
+    out_enhanced = out_dir / 'enhanced'
+    # Create dirs
+    out_dir.mkdir(exist_ok=True)
+    out_noisy.mkdir(exist_ok=True)
+    out_enhanced.mkdir(exist_ok=True)
+    # Copy the wavs
+    copy_n_wavs(noisy_dir.absolute(), out_noisy.absolute(), max_n)
+    copy_n_wavs(enhanced_dir.absolute(), out_enhanced.absolute(), max_n)    
+
+
 #
 # The actual tasks themselves
 #
@@ -515,12 +540,26 @@ def task_plot():
 
 def task_backup_results():
     ''' Save results into .tar.gz with current date/time whenever changed '''
+    NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
+    MIXED_WAVS_TEST = MIXED_WAVS_DIR / 'test'/ f"{CONFIG['test_snr']}db/"
     return {
         'task_dep': ['plot', 'get_stats'],
         'targets': [f'{RESULT_DIR}/previous'],
         'actions': [
+            # Backup SEGAN files
+            (copy_sample_files,
+             [
+                 MIXED_WAVS_TEST, SEGAN_OUTPUT_FOLDER,
+                 RESULT_DIR/'segan_sample', NUM_WAVS_BACKUP
+             ]),
+            # Backup DNN files
+            (copy_sample_files,
+             [
+                 MIXED_WAVS_TEST, ENH_WAVS_DIR,
+                 RESULT_DIR/'dnn_sample', NUM_WAVS_BACKUP
+             ]),
             # Remove older SEGAN checkpoints to save ~1GB of disk!
-            f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}", 
+            f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}",
             # Backup everything else in results dir
             f"bash backup_results.sh {RESULT_DIR}"
         ]
