@@ -516,7 +516,7 @@ def task_plot():
 def task_backup_results():
     ''' Save results into .tar.gz with current date/time whenever changed '''
     return {
-        'task_dep': ['plot'],
+        'task_dep': ['plot', 'get_stats'],
         'targets': [f'{RESULT_DIR}/previous'],
         'actions': [
             # Remove older SEGAN checkpoints to save ~1GB of disk!
@@ -533,12 +533,11 @@ def task_get_stats():
     return {
         'file_dep': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt',
                     f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
+        'targets': [f'{RESULT_DIR}/dnn_summary.txt', f'{RESULT_DIR}/segan_summary.txt'],
         'actions': [
             Interactive("echo DNN ------------------"),
-            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv --pesq_file={RESULT_DIR}/dnn_pesq_results.txt"),
+            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv --pesq_file={RESULT_DIR}/dnn_pesq_results.txt | tee {RESULT_DIR}/dnn_summary.txt"),
             Interactive("echo SEGAN+  -------------"),
-            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv --pesq_file={RESULT_DIR}/segan_pesq_results.txt"),
+            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv --pesq_file={RESULT_DIR}/segan_pesq_results.txt | tee {RESULT_DIR}/segan_summary.txt"),
         ],
-        
-        'uptodate': [False]  # Always run this
     }
