@@ -89,6 +89,7 @@ SEGAN_CONFIG = {
 # Cannot use "+" in folder due to PESQ limitations
 SEGAN_OUTPUT_FOLDER = CONFIG["workspace"] / "synth_segan"
 SEGAN_TRAIN_FOLDER = CONFIG['workspace'] / "segan_train_data"
+SEGAN_VALIDATION_FOLDER = CONFIG['workspace'] / "segan_validation_data"
 SEGAN_TMP_FOLDER = CONFIG['workspace'] / "segan_tmp"
 # FIXME CKPT_DIR in wrong place! Should be RESULT_DIR/minidata/ckpt_segan+
 SEGAN_CKPT_DIR = RESULT_DIR/"ckpt_segan+"
@@ -349,17 +350,17 @@ def task_write_out_scalar():
         'clean': True,
     }
 
-@create_after(executed='calculate_mixture_features',target_regex=".*.wav")
+
 def task_prepare_segan_data():
     return {
-        'file_dep' : list(pathlib.Path(MIXED_WAVS_DIR).glob("*.wav")),
         'task_dep': ['calculate_mixture_features'],
-        'targets': [SEGAN_TRAIN_FOLDER],
+        'targets': [SEGAN_TRAIN_FOLDER, SEGAN_VALIDATION_FOLDER],
         'actions': [Interactive(
             "python ./prepare_segan_data.py "
             f"--clean_dir={DATA['train']['speech']} "
             f"--noisy_dir={MIXED_WAVS_DIR}/train/{CONFIG['train_snr']}db "
-            f"--output_dir=%(targets)s "
+            f"--train_dir={SEGAN_TRAIN_FOLDER} "
+            f"--validation_dir={SEGAN_VALIDATION_FOLDER} "
         )]
     }
 
@@ -406,8 +407,10 @@ def task_train_segan():
             f"{SEGAN_CONFIG['python']} -u {SEGAN_CONFIG['path']/'train.py'} "
             f"--save_path {SEGAN_CKPT_DIR} "
             f"--save_freq {save_freq} "
-            f"--clean_trainset {DATA['train']['speech']} "
-            f"--noisy_trainset {SEGAN_TRAIN_FOLDER} "
+            f"--clean_trainset {SEGAN_TRAIN_FOLDER}/clean "
+            f"--noisy_trainset {SEGAN_TRAIN_FOLDER}/noisy "
+            # f"--clean_valset {SEGAN_VALIDATION_FOLDER}/clean "
+            # f"--noisy_valset {SEGAN_VALIDATION_FOLDER}/noisy "
             f"--cache_dir {SEGAN_TMP_FOLDER} "
             f"--no_train_gen "
             f"--batch_size {SEGAN_CONFIG['batch_size']} " +
