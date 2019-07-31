@@ -295,115 +295,59 @@ def task_segan():
 
 
 
-def task_calculate_pesq():
-    ''' Calculate PESQ of all enhanced speech '''
-    return {
-        'task_dep': ['inference', 'segan'],
-        'targets': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt'],
-        'actions': [
-            # Evaluate PESQ
-            Interactive(
-                f"python evaluate_pesq.py calculate_pesq "
-                f"--workspace={CONFIG['workspace']} "
-                f"--speech_dir={DATA['test']['speech']} --te_snr={CONFIG['test_snr']} "
-            ),
-            f"mv _pesq_results.txt {RESULT_DIR}/dnn_pesq_results.txt",
-            # Evaluate SEGAN
-            Interactive(
-                f"python evaluate_pesq.py calculate_pesq "
-                f"--workspace={CONFIG['workspace']} "
-                f"--speech_dir={DATA['test']['speech']} "
-                f"--enh_speech_dir={SEGAN_OUTPUT_FOLDER} "
-                f"--te_snr={CONFIG['test_snr']} "
-            ),
-            f"mv _pesq_results.txt {RESULT_DIR}/segan_pesq_results.txt",
-            # Cleanup
-            "rm _pesq_itu_results.txt"
-        ],
-    }
-
-
-def task_calculate_bss_stoi():
-    ''' Calculate bss and stoi of all enhanced speech '''
-    return {
-        'task_dep': ['inference', 'segan'],
-        'targets': [f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
-        'actions': [
-            # Evaluate PESQ
-            Interactive(
-                f"python evaluator.py "
-                f"-q " # Hide warnings
-                f"--clean_dir={DATA['test']['speech']} "
-                f"--dirty_dir={ENH_WAVS_DIR} "
-                f"--output_file={RESULT_DIR}/dnn_bss_stoi.csv"
-            ),
-            # Evaluate SEGAN
-            Interactive(
-                f"python evaluator.py "
-                f"-q "
-                f"--clean_dir={DATA['test']['speech']} "
-                f"--dirty_dir={SEGAN_OUTPUT_FOLDER} "
-                f"--output_file={RESULT_DIR}/segan_bss_stoi.csv"
-            ),
-        ],
-    }
-
-
 def task_plot():
-    ''' Generate plots for all data'''
-    return {
-        'task_dep' : ['calculate_bss_stoi', 'calculate_pesq'],
-        'targets': [f'{RESULT_DIR}/segan_plot.png', f'{RESULT_DIR}/dnn_plot.png'],
-        'actions': [
-            f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv "
-                f"--pesq_file={RESULT_DIR}/dnn_pesq_results.txt "
-                f"--plot_file={RESULT_DIR}/dnn_plot.png",
-            f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv "
-                f"--pesq_file={RESULT_DIR}/segan_pesq_results.txt "
-                f"--plot_file={RESULT_DIR}/segan_plot.png"
-        ],
-    }
+    ''' Plot everything we have data for '''
+    pesq_files = RESULT_DIR.glob("*_pesq_results.txt")
+    bss_files =  RESULT_DIR.glob("*_bss_stoi.csv")
+
+    def models_from_results(files):
+        ''' Converts "modelname_pesq.txt" into "modelname" '''
+        return [str(f.stem).split("_")[0] for f in files]
+
+    pesq_models = models_from_results(pesq_files)
+    bss_models = models_from_results(bss_files)
+
+    # Only plot what we have _both_ pesq and bss files for
+    # TODO skip part of plot if data not available?
+    models = set.union(set(pesq_models),set(bss_models))
+
+    for model in models:
+        yield {
+            'name': model,
+            'file_dep' : [f'{RESULT_DIR}/{model}_pesq_results.txt', f'{RESULT_DIR}/{model}_bss_stoi.csv'],
+            'targets': [f'{RESULT_DIR}/{model}_plot.png'],
+            'actions': [
+                f"python show_stats.py --csv_file={RESULT_DIR}/{model}_bss_stoi.csv "
+                    f"--pesq_file={RESULT_DIR}/{model}_pesq.txt "
+                    f"--plot_file={RESULT_DIR}/{model}_plot.png"
+                    f" > {RESULT_DIR}/{model}_summary.txt" # Save summary to text file as well
+            ],
+        }
 
 
-def task_backup_results():
-    ''' Save results into .tar.gz with current date/time whenever changed '''
-    NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
-    MIXED_WAVS_TEST = DATA['mixed'] / 'test'/ f"{CONFIG['test_snr']}db/"
-    return {
-        'task_dep': ['plot', 'get_stats'],
-        'targets': [f'{RESULT_DIR}/previous'],
-        'actions': [
-            # Backup SEGAN files
-            (copy_sample_files,
-             [
-                 MIXED_WAVS_TEST, SEGAN_OUTPUT_FOLDER,
-                 RESULT_DIR/'segan_sample', NUM_WAVS_BACKUP
-             ]),
-            # Backup DNN files
-            (copy_sample_files,
-             [
-                 MIXED_WAVS_TEST, ENH_WAVS_DIR,
-                 RESULT_DIR/'dnn_sample', NUM_WAVS_BACKUP
-             ]),
-            # Remove older SEGAN checkpoints to save ~1GB of disk!
-            f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}",
-            # Backup everything else in results dir
-            f"bash backup_results.sh {RESULT_DIR}"
-        ]
-    }
-
-
-
-def task_get_stats():
-    ''' Calculate overall stats '''
-    return {
-        'file_dep': [f'{RESULT_DIR}/dnn_pesq_results.txt', f'{RESULT_DIR}/segan_pesq_results.txt',
-                    f'{RESULT_DIR}/dnn_bss_stoi.csv', f'{RESULT_DIR}/segan_bss_stoi.csv'],
-        'targets': [f'{RESULT_DIR}/dnn_summary.txt', f'{RESULT_DIR}/segan_summary.txt'],
-        'actions': [
-            Interactive("echo DNN ------------------"),
-            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/dnn_bss_stoi.csv --pesq_file={RESULT_DIR}/dnn_pesq_results.txt | tee {RESULT_DIR}/dnn_summary.txt"),
-            Interactive("echo SEGAN+  -------------"),
-            Interactive(f"python show_stats.py --csv_file={RESULT_DIR}/segan_bss_stoi.csv --pesq_file={RESULT_DIR}/segan_pesq_results.txt | tee {RESULT_DIR}/segan_summary.txt"),
-        ],
-    }
+# def task_backup_results():
+#     ''' Save results into .tar.gz with current date/time whenever changed '''
+#     NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
+#     MIXED_WAVS_TEST = DATA['mixed'] / 'test'/ f"{CONFIG['test_snr']}db/"
+#     return {
+#         'task_dep': ['plot', 'get_stats'],
+#         'targets': [f'{RESULT_DIR}/previous'],
+#         'actions': [
+#             # Backup SEGAN files
+#             (copy_sample_files,
+#              [
+#                  MIXED_WAVS_TEST, SEGAN_OUTPUT_FOLDER,
+#                  RESULT_DIR/'segan_sample', NUM_WAVS_BACKUP
+#              ]),
+#             # Backup DNN files
+#             (copy_sample_files,
+#              [
+#                  MIXED_WAVS_TEST, ENH_WAVS_DIR,
+#                  RESULT_DIR/'dnn_sample', NUM_WAVS_BACKUP
+#              ]),
+#             # Remove older SEGAN checkpoints to save ~1GB of disk!
+#             f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}",
+#             # Backup everything else in results dir
+#             f"bash backup_results.sh {RESULT_DIR}"
+#         ]
+#     }

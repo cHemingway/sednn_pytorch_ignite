@@ -11,6 +11,7 @@ from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         create_folder, run_once, title_with_actions)
 
 from tasks.utils import delete_dir, get_source_files
+import tasks.evaluate 
 
 # Config specific to SEGAN only
 SEGAN_CONFIG = {
@@ -154,9 +155,31 @@ class SEGAN_task_creator(object):
             'uptodate': [config_changed(SEGAN_CONFIG)],
         }
 
+    def calculate_pesq(self):
+        ''' Wrapper around calculate_pesq with correct parameters '''
+        task = tasks.evaluate.calculate_pesq(self.workspace, 
+                                             self.result_dir/"segan_pesq_results.txt",
+                                             self.data, self.enhanced_dir,
+                                             self.test_snr)
+        task['name'] = 'calculate_pesq'
+        task['task_dep'] = ['segan:inference'] # TODO depend on WAVS instead
+        return task
+
+
+    def calculate_bss_stoi(self):
+        ''' Wrapper around calculate_bss_stoi with correct parameters '''
+        task = tasks.evaluate.calculate_bss_stoi(
+                                             self.result_dir/"segan_bss_stoi.csv",
+                                             self.data,
+                                             self.enhanced_dir)
+        task['name'] = 'calculate_bss_stoi'
+        task['task_dep'] = ['segan:inference'] # TODO depend on WAVS instead
+        return task
+
 
     def tasks(self):
         ''' SEGAN+ GAN Based Speech Enhancement '''
         # This docstring is what pydoit shows as the "group" of tasks
-        for task in [self.prepare_data, self.train, self.inference]:
+        for task in [self.prepare_data, self.train, self.inference,
+                     self.calculate_pesq, self.calculate_bss_stoi]:
             yield task()
