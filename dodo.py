@@ -21,9 +21,11 @@ from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         create_folder, run_once, title_with_actions)
 from doit import get_var, create_after
 
-# Import SEGAN task
+
+# Import other tasks and utilities
 from tasks.segan import SEGAN_task_creator
-from tasks.utils import get_data_filenames, get_source_files, delete_dirs
+from tasks.mask_dnn import MASK_DNN_basic_creator 
+from tasks.utils import get_data_filenames, get_source_files, delete_dir, delete_dirs
 
 CONFIG = {
     "fulldata": get_var('fulldata', None),
@@ -47,8 +49,7 @@ DOIT_CONFIG = {
     'dep_file': '.doit{}.db'.format('_fulldata' if CONFIG['fulldata'] else '')
 }
 
-# Keep backend out of CONFIG so can calculate without needing new features
-BACKEND = get_var('backend', "pytorch")
+
 
 ITERATION = get_var('iteration', 10000)
 
@@ -99,14 +100,7 @@ PACKED_FEATURE_PATHS = [
 SCALAR_PATH = CONFIG["workspace"] / "packed_features" / "spectrogram" / "train" \
     / f'{CONFIG["train_snr"]}db' / "scaler.p"
 
-MODEL_PATH = CONFIG["workspace"] / 'models' / f'{CONFIG["train_snr"]}db' \
-    / f'chkpoint__ig_model_10.pth'
 
-
-ENH_WAVS_DIR = CONFIG['workspace']/"enh_wavs"/"test" \
-    / "{}db".format(CONFIG['test_snr'])
-
-print(MODEL_PATH)
 
 # Needed to get around the args nonsense
 class DictAttr(dict):
@@ -172,7 +166,7 @@ def task_make_workspace():
         'actions': [
             (create_folder, [CONFIG["workspace"]])
         ],
-        'clean':[(delete_dirs, [CONFIG["workspace"]] )],
+        'clean':[(delete_dir, [CONFIG["workspace"]] )],
         'uptodate': [config_changed(str(CONFIG["workspace"]))],
         }
 
@@ -253,40 +247,17 @@ def task_write_out_scalar():
         'clean': True,
     }
 
-
-def task_train():
-    return {
-        'file_dep': [SCALAR_PATH] + get_source_files(BACKEND) + PACKED_FEATURE_PATHS,
-        'targets': [
-            MODEL_PATH
-        ],
-        'actions': [Interactive(
-            f"python {BACKEND}/main_ignite.py train "
-            f"--workspace={CONFIG['workspace']} "
-            f"--tr_snr={CONFIG['train_snr']} --te_snr={CONFIG['test_snr']}"
-        )],
-    }
+@create_after(executed='calculate_mixture_features', target_regex='*.*')
+def task_mask_basic_dnn():
+    task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'], RESULT_DIR,
+                                     SCALAR_PATH, PACKED_FEATURE_PATHS,
+                                     CONFIG['fulldata'],
+                                     CONFIG['train_snr'], CONFIG['test_snr'],
+                                     CONFIG['n_concat'])
+    yield task_gen.tasks()
 
 
-@create_after(executed='calculate_mixture_features', target_regex='*.wav')
-def task_inference():
-    mixed = list(DATA['mixed'].rglob('*.wav'))
-    return {
-        'file_dep': mixed + get_source_files(BACKEND), # TODO Add checkpoint
-        'task_dep': ['train'],
-        'targets': [
-            ENH_WAVS_DIR
-        ],
-        'actions': [Interactive(
-            f"python {BACKEND}/main_ignite.py inference "
-            f"--workspace={CONFIG['workspace']} "
-            f"--tr_snr={CONFIG['train_snr']} --te_snr={CONFIG['test_snr']} "
-            f"--n_concat={CONFIG['n_concat']}"
-        )]
-    }
-
-
-@create_after(executed='calculate_mixture_features', target_regex='*.wav')
+@create_after(executed='calculate_mixture_features', target_regex='*.*')
 def task_segan():
     segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], RESULT_DIR,
                                         CONFIG['fulldata'],
@@ -297,15 +268,15 @@ def task_segan():
 
 def task_plot():
     ''' Plot everything we have data for '''
-    pesq_files = RESULT_DIR.glob("*_pesq_results.txt")
-    bss_files =  RESULT_DIR.glob("*_bss_stoi.csv")
+    
+    def models_from_files(results, suffix):
+        ''' Find the name of all models with given file suffixes '''
+        files = results.glob("*"+suffix)
+        # Converts "path/to/modelname_pesq.txt" into "modelname"
+        return [str(f.name).replace(suffix,"") for f in files]
 
-    def models_from_results(files):
-        ''' Converts "modelname_pesq.txt" into "modelname" '''
-        return [str(f.stem).split("_")[0] for f in files]
-
-    pesq_models = models_from_results(pesq_files)
-    bss_models = models_from_results(bss_files)
+    pesq_models = models_from_files(RESULT_DIR, "_pesq_results.txt")
+    bss_models = models_from_files(RESULT_DIR, "_bss_stoi.csv")
 
     # Only plot what we have _both_ pesq and bss files for
     # TODO skip part of plot if data not available?
