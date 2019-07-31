@@ -83,7 +83,8 @@ SEGAN_CONFIG = {
     # _should_ use conda run instead, but breaks for some reason, not sure why
     'python': "/home/chris/anaconda3/envs/segan_pytorch/bin/python",
     'num_samples': get_var('segan_samples',None),
-    'batch_size': get_var('segan_batch_size',100)
+    'batch_size': get_var('segan_batch_size',100),
+    'patience': get_var('segan_patience', 25) # Quit after 25 epochs if no result
 }
 
 # Cannot use "+" in folder due to PESQ limitations
@@ -355,7 +356,9 @@ def task_prepare_segan_data():
     return {
         'task_dep': ['calculate_mixture_features'],
         'targets': [SEGAN_TRAIN_FOLDER, SEGAN_VALIDATION_FOLDER],
-        'actions': [Interactive(
+        'actions': [
+            f"rm -rf {SEGAN_TMP_FOLDER}", # Or else SEGAN cache's old data
+            Interactive(
             "python ./prepare_segan_data.py "
             f"--clean_dir={DATA['train']['speech']} "
             f"--noisy_dir={MIXED_WAVS_DIR}/train/{CONFIG['train_snr']}db "
@@ -383,7 +386,7 @@ def task_train():
 def task_train_segan():
     ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
     if CONFIG["fulldata"]:
-        save_freq = 50
+        save_freq = 10
     else:
         save_freq = 500
 
@@ -409,9 +412,10 @@ def task_train_segan():
             f"--save_freq {save_freq} "
             f"--clean_trainset {SEGAN_TRAIN_FOLDER}/clean "
             f"--noisy_trainset {SEGAN_TRAIN_FOLDER}/noisy "
-            # f"--clean_valset {SEGAN_VALIDATION_FOLDER}/clean "
-            # f"--noisy_valset {SEGAN_VALIDATION_FOLDER}/noisy "
+            f"--clean_valset {SEGAN_VALIDATION_FOLDER}/clean "
+            f"--noisy_valset {SEGAN_VALIDATION_FOLDER}/noisy "
             f"--cache_dir {SEGAN_TMP_FOLDER} "
+            f"--patience {SEGAN_CONFIG['patience']} "
             f"--no_train_gen "
             f"--batch_size {SEGAN_CONFIG['batch_size']} " +
             samples_config_str +
