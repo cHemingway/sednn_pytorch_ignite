@@ -318,7 +318,7 @@ def task_plot():
             'targets': [f'{RESULT_DIR}/{model}_plot.png'],
             'actions': [
                 f"python show_stats.py --csv_file={RESULT_DIR}/{model}_bss_stoi.csv "
-                    f"--pesq_file={RESULT_DIR}/{model}_pesq.txt "
+                    f"--pesq_file={RESULT_DIR}/{model}_pesq_results.txt "
                     f"--plot_file={RESULT_DIR}/{model}_plot.png"
                     f" > {RESULT_DIR}/{model}_summary.txt" # Save summary to text file as well
             ],
