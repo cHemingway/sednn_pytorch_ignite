@@ -5,10 +5,12 @@ Will be imported from dodo.py
 '''
 
 import pathlib
+import json
 
 from doit import get_var, create_after
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         create_folder, run_once, title_with_actions)
+from doit.task import DelayedLoader
 
 from tasks.utils import delete_dir, get_source_files
 import tasks.evaluate 
@@ -82,8 +84,10 @@ class SEGAN_task_creator(object):
         ''' Train SEGAN+ on the same testset, keeping temp files in workspace '''
         if self.fulldata:
             save_freq = 10
+            epochs = 100
         else:
             save_freq = 500
+            epochs = 10
 
         # For SEGAN, the way you specify "all samples", is by 
         # _not_ specifying --max-samples. Hence we have to do this logic
@@ -92,11 +96,11 @@ class SEGAN_task_creator(object):
         else:
             samples_config_str = " "
 
+
         return {
             'name':'train',
-            'file_dep': list(self.train_dir.rglob("*.wav")) + \
-                        get_source_files(SEGAN_CONFIG['path']),  # Depend on SEGAN source files
-            'task_dep': ['segan:prepare_data'],
+            'file_dep': get_source_files(SEGAN_CONFIG['path']),  # Depend on SEGAN source files
+            'task_dep': ['segan:prepare_data'], # Depend on data task, not actual files
             'targets': [self.ckpt_dir/'EOE_D-checkpoints', 
                         self.ckpt_dir/'EOE_G-checkpoints',
                         self.ckpt_dir/'train.opts'], # TODO add .ckpt file itself
@@ -111,6 +115,7 @@ class SEGAN_task_creator(object):
                 f"--clean_valset {self.validation_dir}/clean "
                 f"--noisy_valset {self.validation_dir}/noisy "
                 f"--cache_dir {self.tmp_dir} "
+                f"--epoch {epochs} "
                 f"--patience {SEGAN_CONFIG['patience']} "
                 f"--no_train_gen "
                 f"--batch_size {SEGAN_CONFIG['batch_size']} " +
@@ -123,6 +128,7 @@ class SEGAN_task_creator(object):
         }
 
 
+    @create_after("segan:train",target_regex="*.wav")
     def inference(self):
         mixed = list(self.data['mixed'].rglob('*.wav'))
         try:
