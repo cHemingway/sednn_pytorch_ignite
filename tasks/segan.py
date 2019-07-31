@@ -64,9 +64,10 @@ class SEGAN_task_creator(object):
 
 
     def prepare_data(self):
+        mixed_wav_files = list(self.data['mixed'].rglob("*.wav"))
         return {
             'name': 'prepare_data',
-            'task_dep': ['calculate_mixture_features'],
+            'file_dep': mixed_wav_files,
             'targets': [self.train_dir, self.validation_dir],
             'actions': [
                 f"rm -rf {self.tmp_dir}", # Or else SEGAN cache's old data
@@ -161,6 +162,7 @@ class SEGAN_task_creator(object):
             'uptodate': [config_changed(SEGAN_CONFIG)],
         }
 
+    @create_after("segan:train",target_regex="*.*")
     def calculate_pesq(self):
         ''' Wrapper around calculate_pesq with correct parameters '''
         task = tasks.evaluate.calculate_pesq(self.workspace, 
@@ -168,10 +170,12 @@ class SEGAN_task_creator(object):
                                              self.data, self.enhanced_dir,
                                              self.test_snr)
         task['name'] = 'calculate_pesq'
-        task['task_dep'] = ['segan:inference'] # TODO depend on WAVS instead
+        clean_wav_files = list(self.enhanced_dir.rglob("*.wav"))
+        task['file_dep'] = clean_wav_files
         return task
 
 
+    @create_after("segan:train",target_regex="*.*")
     def calculate_bss_stoi(self):
         ''' Wrapper around calculate_bss_stoi with correct parameters '''
         task = tasks.evaluate.calculate_bss_stoi(
@@ -179,7 +183,8 @@ class SEGAN_task_creator(object):
                                              self.data,
                                              self.enhanced_dir)
         task['name'] = 'calculate_bss_stoi'
-        task['task_dep'] = ['segan:inference'] # TODO depend on WAVS instead
+        clean_wav_files = list(self.enhanced_dir.rglob("*.wav"))
+        task['file_dep'] = clean_wav_files
         return task
 
 

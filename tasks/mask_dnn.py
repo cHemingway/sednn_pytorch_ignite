@@ -71,6 +71,7 @@ class MASK_DNN_basic_creator(object):
         }
 
 
+    @create_after("mask_basic_dnn:inference",target_regex="*.*")
     def calculate_pesq(self):
         ''' Wrapper around calculate_pesq with correct parameters '''
         task = tasks.evaluate.calculate_pesq(self.workspace,
@@ -78,11 +79,12 @@ class MASK_DNN_basic_creator(object):
                                                 self.data, self.enhanced_dir,
                                                 self.test_snr)
         task['name'] = 'calculate_pesq'
-        # TODO depend on WAVS instead
-        task['task_dep'] = ['mask_basic_dnn:inference']
+        clean_wav_files = list(self.enhanced_dir.rglob("*.wav"))
+        task['file_dep'] = clean_wav_files
         return task
 
 
+    @create_after("mask_basic_dnn:inference",target_regex="*.*")
     def calculate_bss_stoi(self):
         ''' Wrapper around calculate_bss_stoi with correct parameters '''
         task = tasks.evaluate.calculate_bss_stoi(
@@ -91,7 +93,8 @@ class MASK_DNN_basic_creator(object):
             self.enhanced_dir)
         task['name'] = 'calculate_bss_stoi'
         # TODO depend on WAVS instead
-        task['task_dep'] = ['mask_basic_dnn:inference']
+        clean_wav_files = list(self.enhanced_dir.rglob("*.wav"))
+        task['file_dep'] = clean_wav_files
         return task
 
 

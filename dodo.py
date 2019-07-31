@@ -50,9 +50,6 @@ DOIT_CONFIG = {
 }
 
 
-
-ITERATION = get_var('iteration', 10000)
-
 DATA = {}
 if CONFIG["fulldata"]:
     DATA = {
