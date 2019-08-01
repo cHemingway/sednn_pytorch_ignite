@@ -31,17 +31,18 @@ SEGAN_CONFIG = {
 class SEGAN_task_creator(object):
     ''' Task creator object for SEGAN '''
     def __init__(self, data, workspace_dir: pathlib.Path, 
+                 enhanced_dir: pathlib.Path,
                  result_dir: pathlib.Path, fulldata: bool, 
                  train_snr:float, test_snr:float):
         self.data = data
         self.workspace = workspace_dir
+        self.enhanced_dir = enhanced_dir
         self.result_dir = result_dir
         self.fulldata = fulldata
         self.train_snr = train_snr
         self.test_snr = test_snr
         
         # Create subdirectory names for SEGAN
-        self.enhanced_dir = self.workspace / "synth_segan"
         self.train_dir = self.workspace / "segan_train_data"
         self.validation_dir = self.workspace / "segan_validation_data"
         self.tmp_dir = self.workspace / "segan_tmp"
@@ -188,9 +189,23 @@ class SEGAN_task_creator(object):
         return task
 
 
+    @create_after("segan:inference",target_regex="*.opt")
+    def purge_ckpts(self):
+        return {
+            'name':'purge_ckpts',
+            'file_dep': get_source_files(SEGAN_CONFIG['path']) + [
+                self.ckpt_dir/'EOE_G-checkpoints',
+                self.ckpt_dir/'train.opts'
+                ],
+            'actions' : [
+                f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {self.ckpt_dir}",
+            ]
+        }
+
     def tasks(self):
         ''' SEGAN+ GAN Based Speech Enhancement '''
         # This docstring is what pydoit shows as the "group" of tasks
         for task in [self.prepare_data, self.train, self.inference,
-                     self.calculate_pesq, self.calculate_bss_stoi]:
+                     self.calculate_pesq, self.calculate_bss_stoi,
+                     self.purge_ckpts]:
             yield task()

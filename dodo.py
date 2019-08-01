@@ -19,7 +19,8 @@ from doit import get_var, create_after
 from tasks.segan import SEGAN_task_creator
 from tasks.mask_dnn import MASK_DNN_basic_creator 
 from tasks.data_prepare import Data_Prepare_creator
-from tasks.utils import get_data_filenames, get_source_files, delete_dir, delete_dirs
+from tasks.utils import get_data_filenames, get_source_files, delete_dir,\
+                         delete_dirs, copy_sample_files
 
 CONFIG = {
     "fulldata": get_var('fulldata', None),
@@ -108,9 +109,13 @@ def task_prepare_data():
     yield task_gen.tasks()
 
 
+BASIC_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" /"basic"
+
 @create_after(executed='prepare_data', target_regex='*.*')
 def task_mask_basic_dnn():
-    task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'], RESULT_DIR,
+    task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'], 
+                                     BASIC_ENHANCED_DIR,
+                                     RESULT_DIR,
                                      SCALAR_PATH, PACKED_FEATURE_PATHS,
                                      CONFIG['fulldata'],
                                      CONFIG['train_snr'], CONFIG['test_snr'],
@@ -118,9 +123,13 @@ def task_mask_basic_dnn():
     yield task_gen.tasks()
 
 
+SEGAN_ENHANCED_DIR = CONFIG['workspace'] / "enh_wavs"/"synth_segan" # Files cleaned by SEGAN
+
 @create_after(executed='prepare_data', target_regex='*.*')
 def task_segan():
-    segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], RESULT_DIR,
+    segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], 
+                                        SEGAN_ENHANCED_DIR,
+                                        RESULT_DIR,
                                         CONFIG['fulldata'],
                                         CONFIG['train_snr'], CONFIG['test_snr'])
     yield segan_task_gen.tasks()
@@ -157,29 +166,45 @@ def task_plot():
         }
 
 
-# def task_backup_results():
-#     ''' Save results into .tar.gz with current date/time whenever changed '''
-#     NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
-#     MIXED_WAVS_TEST = DATA['mixed'] / 'test'/ f"{CONFIG['test_snr']}db/"
-#     return {
-#         'task_dep': ['plot', 'get_stats'],
-#         'targets': [f'{RESULT_DIR}/previous'],
-#         'actions': [
-#             # Backup SEGAN files
-#             (copy_sample_files,
-#              [
-#                  MIXED_WAVS_TEST, SEGAN_OUTPUT_FOLDER,
-#                  RESULT_DIR/'segan_sample', NUM_WAVS_BACKUP
-#              ]),
-#             # Backup DNN files
-#             (copy_sample_files,
-#              [
-#                  MIXED_WAVS_TEST, ENH_WAVS_DIR,
-#                  RESULT_DIR/'dnn_sample', NUM_WAVS_BACKUP
-#              ]),
-#             # Remove older SEGAN checkpoints to save ~1GB of disk!
-#             f"python {SEGAN_CONFIG['path']}/purge_ckpts.py {SEGAN_CKPT_DIR}",
-#             # Backup everything else in results dir
-#             f"bash backup_results.sh {RESULT_DIR}"
-#         ]
-#     }
+@create_after(executed='plot')
+def task_backup_results():
+    ''' Save results into .tar.gz with current date/time whenever changed '''
+    NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
+    MIXED_WAVS_TEST = DATA['mixed'] / 'test'/ f"{CONFIG['test_snr']}db/"
+
+
+    backup_list = [
+        ('segan', SEGAN_ENHANCED_DIR),
+        ('basic', BASIC_ENHANCED_DIR)
+    ]
+
+    # Copy sample files from enhanced dir to sample_dir, saving deps produced
+    backup_task_deps = []
+    for model_name, enh_dir in backup_list:
+        sample_dir = RESULT_DIR/f'{model_name}_sample'
+        sample_task_name = f'sample_{model_name}'
+        # Hack, to keep a list of these dependencies, we need to generate the 
+        # same name for this task that pydoit will use. This way, we can ensure
+        # backup_dir depends on all of the tasks we generate here
+        backup_task_deps.append('backup_results:' + sample_task_name)
+        yield {
+            'name' : sample_task_name,
+            'task_dep': ['plot'],
+            'targets': [sample_dir],
+            'actions': [
+                (copy_sample_files,
+                    [ MIXED_WAVS_TEST, enh_dir, sample_dir, NUM_WAVS_BACKUP ]
+                )
+            ]
+        }
+
+    # Backup the folder
+    yield {
+        'name': 'backup_dir',
+        'task_dep' : backup_task_deps,
+        'targets': [f'{RESULT_DIR}/previous'],
+        'actions': [
+            # Backup everything else in results dir
+            f"bash backup_results.sh {RESULT_DIR}"
+        ]
+    }

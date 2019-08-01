@@ -214,8 +214,7 @@ def inference(args):
     model_path = os.path.join(workspace, 'models', '{}db'.format(int(tr_snr)), 
         'chkpoint__ig_model_10.pth')
         
-    enh_audios_dir = os.path.join(workspace, 'enh_wavs', data_type, 
-        '{}db'.format(int(te_snr)))
+    enh_audios_dir = args.enhanced_dir
 
     # Load model
     model = DNN(n_concat, freq_bins)   
@@ -303,6 +302,7 @@ if __name__ == '__main__':
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
+    parser_inference.add_argument('--enhanced_dir', type=str, required=True)
     parser_inference.add_argument('--tr_snr', type=float, required=True)
     parser_inference.add_argument('--te_snr', type=float, required=True)
     parser_inference.add_argument('--n_concat', type=int, required=True)

@@ -17,6 +17,7 @@ class MASK_DNN_basic_creator(object):
     ''' Task creator object for existing mask based DNN '''
 
     def __init__(self, data, workspace_dir: pathlib.Path,
+                 enhanced_dir: pathlib.Path,
                  result_dir: pathlib.Path,
                  scalar_path, packed_feature_paths,
                  fulldata: bool,
@@ -24,6 +25,7 @@ class MASK_DNN_basic_creator(object):
 
         self.data = data
         self.workspace = workspace_dir
+        self.enhanced_dir = enhanced_dir
         self.scalar_path = scalar_path
         self.packed_feature_paths = packed_feature_paths
         self.result_dir = result_dir
@@ -35,8 +37,7 @@ class MASK_DNN_basic_creator(object):
         self.model_path = self.workspace / 'models' / f'{self.train_snr}db' \
             / f'chkpoint__ig_model_10.pth'
 
-        self.enhanced_dir = self.workspace/"enh_wavs" / \
-            "test" / "{}db".format(self.test_snr)
+        
 
     def train(self):
         return {
@@ -65,6 +66,7 @@ class MASK_DNN_basic_creator(object):
             'actions': [Interactive(
                 f"python {BACKEND}/main_ignite.py inference "
                 f"--workspace={self.workspace} "
+                f"--enhanced_dir={self.enhanced_dir} "
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr} "
                 f"--n_concat={self.n_concat}"
             )]
