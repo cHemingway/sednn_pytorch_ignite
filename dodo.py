@@ -205,6 +205,6 @@ def task_backup_results():
         'targets': [f'{RESULT_DIR}/previous'],
         'actions': [
             # Backup everything else in results dir
-            f"bash backup_results.sh {RESULT_DIR}"
+            f"bash scripts/backup_results.sh {RESULT_DIR}"
         ]
     }
