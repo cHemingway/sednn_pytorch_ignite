@@ -1,22 +1,15 @@
-# Alternative to runme.sh
-# Run with doit tool: see pydoit.org
+# Main file to run all experiments
+# Cannot be ran directly! Run this with doit tool: see pydoit.org
 
 # To use full data, run doit fulldata=true
 
 # You can also use full data, e.g. doit workspace=/path/to/workspace
 
-# pylint: disable=wrong-import-order
-
 import os
 import pathlib
 import json
 
-# HACK: Ideally would fix import paths instead
-import sys
-sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
 
-#pylint: disable=wrong-import-position
-from utils import prepare_data
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         create_folder, run_once, title_with_actions)
 from doit import get_var, create_after
@@ -25,6 +18,7 @@ from doit import get_var, create_after
 # Import other tasks and utilities
 from tasks.segan import SEGAN_task_creator
 from tasks.mask_dnn import MASK_DNN_basic_creator 
+from tasks.data_prepare import Data_Prepare_creator
 from tasks.utils import get_data_filenames, get_source_files, delete_dir, delete_dirs
 
 CONFIG = {
@@ -78,14 +72,6 @@ else:
 
 DATA["mixed"] =  CONFIG['workspace']/"mixed_audios"
 
-
-# Set tensorflow log level
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
-
-
-DATA_FILES = get_data_filenames(DATA)
-
-
 PACKED_FEATURE_DIR = CONFIG["workspace"] / 'packed_features' / 'spectrogram'
 PACKED_FEATURE_SUFFIX = pathlib.PurePath(
     f'{CONFIG["train_snr"]}db') / "data.h5"
@@ -98,60 +84,8 @@ SCALAR_PATH = CONFIG["workspace"] / "packed_features" / "spectrogram" / "train" 
     / f'{CONFIG["train_snr"]}db' / "scaler.p"
 
 
-
-# Needed to get around the args nonsense
-class DictAttr(dict):
-    def __getattr__(self, key):
-        if key not in self:
-            raise AttributeError(key)
-        return self[key]
-
-#
-# Wrapper functions to pack args
-#
-def mix_csv(subdata, data_type, magnification=1):
-    args = {
-        "workspace": CONFIG["workspace"],
-        "speech_dir": subdata["speech"],
-        "noise_dir": subdata["noise"],
-        "data_type": data_type,
-        "magnification": magnification
-    }
-    prepare_data.create_mixture_csv(DictAttr(args))
-
-
-def mix_features(subdata, data_type, snr):
-    args = {
-        "workspace": CONFIG["workspace"],
-        "speech_dir": subdata["speech"],
-        "noise_dir": subdata["noise"],
-        "data_type": data_type,
-        "snr": snr
-    }
-    prepare_data.calculate_mixture_features(DictAttr(args))
-
-
-def pack_features(data_type, snr, n_concat, n_hop):
-    args = {
-        "workspace": CONFIG["workspace"],
-        "data_type": data_type,
-        "snr": snr,
-        "n_concat": n_concat,
-        "n_hop": n_hop
-    }
-    prepare_data.pack_features(DictAttr(args))
-
-
-def write_out_scalar(data_type, snr):
-    args = {
-        "workspace": CONFIG["workspace"],
-        "data_type": data_type,
-        "snr": snr,
-        "print_scalar": False
-    }
-    prepare_data.write_out_scaler(DictAttr(args))
-   
-
+# Set tensorflow log level
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
 #
 # The actual tasks themselves
@@ -168,83 +102,13 @@ def task_make_workspace():
         }
 
 
-def task_create_mixture_csv():
-    return {
-        'file_dep':  DATA_FILES + get_source_files("utils"),
-        'task_dep': ['make_workspace'],
-        # Using pathlib slash '/' operator
-        'targets': [
-            CONFIG["workspace"] / 'mixture_csvs' / 'test.csv',
-            CONFIG["workspace"] / 'mixture_csvs' / 'train.csv'
-        ],
-        # Call mix_csv on each type of data
-        # Need to wrap in PythonInteractiveAction for TQDM to work
-        'actions': [
-            PythonInteractiveAction(
-                mix_csv, [DATA["train"], "train", CONFIG["magnification"]]),
-            PythonInteractiveAction(
-                mix_csv, [DATA["test"], "test", CONFIG["magnification"]]),
-        ],
-        'uptodate': [config_changed(CONFIG)],
-        'clean': True,
-    }
+def task_prepare_data():
+    task_gen = Data_Prepare_creator(DATA, CONFIG['workspace'],
+                                     SCALAR_PATH, PACKED_FEATURE_PATHS, CONFIG)
+    yield task_gen.tasks()
 
 
-def task_calculate_mixture_features():
-    return {
-        'file_dep':  DATA_FILES + get_source_files("utils") + task_create_mixture_csv()['targets'],
-        'targets': [
-            DATA['mixed'],
-            CONFIG["workspace"] / "features",
-        ],
-        'actions': [
-            PythonInteractiveAction(
-                mix_features, [DATA["train"], "train", CONFIG["train_snr"]]),
-            PythonInteractiveAction(
-                mix_features, [DATA["test"], "test", CONFIG["test_snr"]]),
-        ],
-        'uptodate': [config_changed(CONFIG)],
-        'clean': True,
-    }
-
-
-@create_after(executed='calculate_mixture_features', target_regex='.*\data.h5')
-def task_pack_features():
-    shared_args = [CONFIG["n_concat"], CONFIG["n_hop"]]
-
-    feature_path = CONFIG["workspace"] / 'features'
-    features = list(feature_path.rglob("*.p"))  # Search for all .p files
-
-    return {
-        'file_dep': features + get_source_files("utils"), 
-        'task_dep': ['calculate_mixture_features'],
-        'targets': PACKED_FEATURE_PATHS,
-        'actions': [
-            PythonInteractiveAction(
-                pack_features, ["train", CONFIG["train_snr"], *shared_args]),
-            PythonInteractiveAction(
-                pack_features, ["test", CONFIG["test_snr"], *shared_args]),
-        ],
-        'uptodate': [config_changed(CONFIG)],
-        'clean': True,
-    }
-
-
-def task_write_out_scalar():
-    return {
-        'file_dep':  PACKED_FEATURE_PATHS + get_source_files("utils"),
-        'targets': [
-            SCALAR_PATH
-        ],
-        'actions': [
-            PythonInteractiveAction(
-                write_out_scalar, ["train", CONFIG["train_snr"]]),
-        ],
-        'uptodate': [config_changed(CONFIG)],
-        'clean': True,
-    }
-
-@create_after(executed='calculate_mixture_features', target_regex='*.*')
+@create_after(executed='prepare_data', target_regex='*.*')
 def task_mask_basic_dnn():
     task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'], RESULT_DIR,
                                      SCALAR_PATH, PACKED_FEATURE_PATHS,
@@ -254,7 +118,7 @@ def task_mask_basic_dnn():
     yield task_gen.tasks()
 
 
-@create_after(executed='calculate_mixture_features', target_regex='*.*')
+@create_after(executed='prepare_data', target_regex='*.*')
 def task_segan():
     segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], RESULT_DIR,
                                         CONFIG['fulldata'],
