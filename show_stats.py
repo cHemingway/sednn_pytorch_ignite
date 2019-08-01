@@ -65,7 +65,7 @@ if __name__ == "__main__":
     try:
         pesq_data = pd.read_csv(args.pesq_file,sep='\t',skipinitialspace=True)
     except FileNotFoundError:
-        sys.exit(f"Could not find PESQ file {args.csv_file}")
+        sys.exit(f"Could not find PESQ file {args.pesq_file}")
 
     # Fixup PESQ and STOI columns and remove unused
     pesq_data = pesq_relabel_columns(pesq_data)
