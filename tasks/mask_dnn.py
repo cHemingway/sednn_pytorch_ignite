@@ -9,9 +9,6 @@ from doit.tools import Interactive
 from tasks.utils import get_source_files
 import tasks.evaluate
 
-# Keep backend out of CONFIG so can calculate without needing new features
-BACKEND = "pytorch"
-
 
 class MASK_DNN_basic_creator(object):
     ''' Task creator object for existing mask based DNN '''
@@ -42,12 +39,12 @@ class MASK_DNN_basic_creator(object):
     def train(self):
         return {
             'name': 'train',
-            'file_dep': [self.scalar_path] + get_source_files(BACKEND) + self.packed_feature_paths,
+            'file_dep': [self.scalar_path] + get_source_files("pytorch") + self.packed_feature_paths,
             'targets': [
                 self.model_path
             ],
             'actions': [Interactive(
-                f"python {BACKEND}/main_ignite.py train "
+                f"python pytorch/main_ignite.py train "
                 f"--workspace={self.workspace} "
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr}"
             )],
@@ -59,12 +56,12 @@ class MASK_DNN_basic_creator(object):
         return {
             # TODO Add checkpoint
             'name': 'inference',
-            'file_dep': mixed + get_source_files(BACKEND) + [self.model_path],
+            'file_dep': mixed + get_source_files("pytorch") + [self.model_path],
             'targets': [
                 self.enhanced_dir
             ],
             'actions': [Interactive(
-                f"python {BACKEND}/main_ignite.py inference "
+                f"python pytorch/main_ignite.py inference "
                 f"--workspace={self.workspace} "
                 f"--enhanced_dir={self.enhanced_dir} "
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr} "
