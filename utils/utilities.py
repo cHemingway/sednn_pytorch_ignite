@@ -4,8 +4,8 @@ import librosa
 import os
 import h5py
 
-from stft import stft
-import config
+from utils.stft import stft
+import utils.config as config
 
 
 def create_folder(fd):

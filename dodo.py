@@ -125,14 +125,14 @@ def task_mask_basic_dnn():
 
 SEGAN_ENHANCED_DIR = CONFIG['workspace'] / "enh_wavs"/"synth_segan" # Files cleaned by SEGAN
 
-@create_after(executed='prepare_data', target_regex='*.*')
-def task_segan():
-    segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], 
-                                        SEGAN_ENHANCED_DIR,
-                                        RESULT_DIR,
-                                        CONFIG['fulldata'],
-                                        CONFIG['train_snr'], CONFIG['test_snr'])
-    yield segan_task_gen.tasks()
+# @create_after(executed='prepare_data', target_regex='*.*')
+# def task_segan():
+#     segan_task_gen = SEGAN_task_creator(DATA, CONFIG['workspace'], 
+#                                         SEGAN_ENHANCED_DIR,
+#                                         RESULT_DIR,
+#                                         CONFIG['fulldata'],
+#                                         CONFIG['train_snr'], CONFIG['test_snr'])
+#     yield segan_task_gen.tasks()
 
 
 

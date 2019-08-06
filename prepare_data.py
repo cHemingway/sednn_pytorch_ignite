@@ -19,10 +19,10 @@ try:
 except:
     import _pickle as cPickle
 
-from utilities import (create_folder, read_audio, write_audio, 
+from utils.utilities import (create_folder, read_audio, write_audio, 
     calculate_spectrogram, log_sp, mat_2d_to_3d, pad_with_border, 
     calculate_scaler)
-import config
+import utils.config as config
 
 
 # ! HACK: fix onset of noise to zero

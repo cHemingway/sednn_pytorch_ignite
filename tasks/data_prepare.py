@@ -3,17 +3,14 @@
 import os
 import pathlib
 
-from doit import create_after
+from doit import create_after, get_var
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         title_with_actions)
 
-# HACK: Ideally would fix import paths instead
-import sys
-sys.path.insert(1, os.path.join(sys.path[0], 'utils'))
-
-#pylint: disable=wrong-import-position
-from utils import prepare_data
+import prepare_data
 from tasks.utils import get_source_files, get_data_filenames
+
+DEBUG_ATTACH = get_var("attach",default=False)
 
 # Needed to get around the args nonsense
 class DictAttr(dict):
