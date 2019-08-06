@@ -30,8 +30,7 @@ from models import DNN, move_data_to_gpu
 import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
 
-
-from utils.audio_datasets import NoisySpeechFeaturesDataset
+from audio_datasets import NoisySpeechFeaturesDataset
 
 
 def plot_spectrogram(x,y,n_concat):
