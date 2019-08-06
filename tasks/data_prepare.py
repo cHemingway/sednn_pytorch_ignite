@@ -7,63 +7,9 @@ from doit import create_after, get_var
 from doit.tools import (Interactive, PythonInteractiveAction, config_changed,
                         title_with_actions)
 
-import prepare_data
 from tasks.utils import get_source_files, get_data_filenames
 
 DEBUG_ATTACH = get_var("attach",default=False)
-
-# Needed to get around the args nonsense
-class DictAttr(dict):
-    def __getattr__(self, key):
-        if key not in self:
-            raise AttributeError(key)
-        return self[key]
-
-#
-# Wrapper functions to pack args
-#
-def mix_csv(workspace, subdata, data_type, magnification=1):
-    args = {
-        "workspace": workspace,
-        "speech_dir": subdata["speech"],
-        "noise_dir": subdata["noise"],
-        "data_type": data_type,
-        "magnification": magnification
-    }
-    prepare_data.create_mixture_csv(DictAttr(args))
-
-
-def mix_features(workspace, subdata, data_type, snr):
-    args = {
-        "workspace": workspace,
-        "speech_dir": subdata["speech"],
-        "noise_dir": subdata["noise"],
-        "data_type": data_type,
-        "snr": snr
-    }
-    prepare_data.calculate_mixture_features(DictAttr(args))
-
-
-def pack_features(workspace, data_type, snr, n_concat, n_hop):
-    args = {
-        "workspace": workspace,
-        "data_type": data_type,
-        "snr": snr,
-        "n_concat": n_concat,
-        "n_hop": n_hop
-    }
-    prepare_data.pack_features(DictAttr(args))
-
-
-def write_out_scalar(workspace, data_type, snr):
-    args = {
-        "workspace": workspace,
-        "data_type": data_type,
-        "snr": snr,
-        "print_scalar": False
-    }
-    prepare_data.write_out_scaler(DictAttr(args))
-   
 
 
 class Data_Prepare_creator(object):
@@ -79,83 +25,98 @@ class Data_Prepare_creator(object):
         # Find names of data files
         self.data_files = get_data_filenames(data)
 
-    def create_mixture_csv(self):
-        # TODO replace with yielding multiple tasks
-        return {
-            'name': 'create_mixture_csv',
+    def create_mixture_csv(self,data_type):
+        ''' Yields a create_mixture_csv task of data_type '''
+        yield {
+            'name': f'create_mixture_csv:{data_type}',
             'file_dep':  self.data_files + get_source_files("utils"),
             'task_dep': ['make_workspace'],
             # Using pathlib slash '/' operator
             'targets': [
-                self.workspace / 'mixture_csvs' / 'test.csv',
-                self.workspace / 'mixture_csvs' / 'train.csv'
+                self.workspace / 'mixture_csvs' / f'{data_type}.csv',
             ],
             # Call mix_csv on each type of data
             # Need to wrap in PythonInteractiveAction for TQDM to work
             'actions': [
-                PythonInteractiveAction(
-                    mix_csv, [self.workspace, self.data["train"], "train", self.config["magnification"]]),
-                PythonInteractiveAction(
-                    mix_csv, [self.workspace, self.data["test"], "test", self.config["magnification"]]),
+                Interactive(
+                    f"python prepare_data.py create_mixture_csv "
+                    f"--workspace={self.workspace} "
+                    f"--speech_dir={self.data[data_type]['speech']} "
+                    f"--noise_dir={self.data[data_type]['noise']} " 
+                    f"--data_type={data_type} "
+                    f"--magnification={self.config['magnification']}"
+                )
             ],
             'uptodate': [config_changed(self.config)],
             'clean': True,
         }
 
 
-    def calculate_mixture_features(self):
-        # TODO replace with yielding multiple tasks
-        return {
-            'name': 'calculate_mixture_features',
-            'file_dep':  self.data_files + get_source_files("utils") + self.create_mixture_csv()['targets'],
+    def calculate_mixture_features(self, data_type):
+        ''' Yields a calculate_mixture_features of data_type '''
+        yield {
+            'name': f'calculate_mixture_features:{data_type}',
+            'task_dep': [f'prepare_data:create_mixture_csv:{data_type}'],
             'targets': [
-                self.data['mixed'],
-                self.workspace / "features",
+                self.data['mixed']/data_type,
+                self.workspace / "features"/'spectogram'/data_type,
             ],
             'actions': [
-                PythonInteractiveAction(
-                    mix_features, [self.workspace, self.data["train"], "train", self.config["train_snr"]]),
-                PythonInteractiveAction(
-                    mix_features, [self.workspace, self.data["test"], "test", self.config["test_snr"]]),
+                Interactive(
+                    f"python prepare_data.py calculate_mixture_features "
+                    f"--workspace={self.workspace} "
+                    f"--speech_dir={self.data[data_type]['speech']} "
+                    f"--noise_dir={self.data[data_type]['noise']} " 
+                    f"--data_type={data_type} "
+                    f"--snr={self.config[f'{data_type}_snr']}"
+                )
             ],
-            'uptodate': [config_changed(self.config)],
             'clean': True,
         }
 
 
-    @create_after(executed='prepare_data:calculate_mixture_features', target_regex='.*\data.h5')
-    def pack_features(self):
-        shared_args = [self.config["n_concat"], self.config["n_hop"]]
-
-        feature_path = self.workspace / 'features'
+    def pack_features(self, data_type):
+        feature_path = self.workspace / 'features' / 'spectrogram' / data_type
         features = list(feature_path.rglob("*.p"))  # Search for all .p files
 
         return {
-            'name': 'pack_features',
-            'file_dep': features + get_source_files("utils"), 
-            'task_dep': ['prepare_data:calculate_mixture_features'], # TODO use files instead
-            'targets': self.packed_feature_paths,
+            'name': f'pack_features:{data_type}',
+            'file_dep': features + get_source_files("utils"),
+            'task_dep': [f'prepare_data:calculate_mixture_features:{data_type}'],
+            'targets': [ # Targets are any feature path with data_type in it
+                    x for x in self.packed_feature_paths if data_type in str(x)
+                ],
             'actions': [
-                PythonInteractiveAction(
-                    pack_features, [self.workspace, "train", self.config["train_snr"], *shared_args]),
-                PythonInteractiveAction(
-                    pack_features, [self.workspace, "test", self.config["test_snr"], *shared_args]),
+                Interactive(
+                    f"python prepare_data.py pack_features "
+                    f"--workspace={self.workspace} "
+                    f"--data_type={data_type} "
+                    f"--snr={self.config[f'{data_type}_snr']} "
+                    f"--n_concat={self.config['n_concat']} "
+                    f"--n_hop={self.config['n_hop']} "
+                )
             ],
             'uptodate': [config_changed(self.config)],
             'clean': True,
         }
 
 
-    def write_out_scalar(self):
+    def write_out_scaler(self, data_type):
+        snr = self.config[f'{data_type}_snr']
         return {
-            'name': 'write_out_data',
+            'name': f'write_out_scaler:{data_type}',
             'file_dep':  self.packed_feature_paths + get_source_files("utils"),
+            'task_dep':  [f'prepare_data:pack_features:{data_type}'],
             'targets': [
                 self.scalar_path
             ],
             'actions': [
-                PythonInteractiveAction(
-                    write_out_scalar, [self.workspace, "train", self.config["train_snr"]]),
+                Interactive(
+                    f"python prepare_data.py write_out_scaler "
+                    f"--workspace={self.workspace} "
+                    f"--data_type={data_type} "
+                    f"--snr={snr}"
+                )
             ],
             'uptodate': [config_changed(self.config)],
             'clean': True,
@@ -164,7 +125,12 @@ class Data_Prepare_creator(object):
 
     def tasks(self):
         ''' Mix audio and extract features '''
-        for task in [self.create_mixture_csv, self.calculate_mixture_features,
-                     self.pack_features, self.write_out_scalar]:
-            yield task()
+        for task in [self.create_mixture_csv, 
+                        self.calculate_mixture_features,
+                        self.pack_features]:
+            for data_type in ["test", "train"]:
+                yield task(data_type)
+
+        # Write out scaler is only used for train
+        yield self.write_out_scaler('train')
                      
