@@ -1,5 +1,6 @@
 import os, sys
-sys.path.insert(1, os.path.join(sys.path[0], '../utils')) # TODO find better way
+# Add parent of parent folder to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 import argparse
 import pickle
@@ -22,15 +23,15 @@ from ignite.contrib.handlers.tensorboard_logger import (
 from termcolor import colored
 from tqdm import tqdm
 
-from utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 
+from utils.utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 
     pad_with_border, log_sp, mat_2d_to_3d, inverse_scale, get_stft_window_func, 
     write_audio, read_audio, calculate_spectrogram)
 from models import DNN, move_data_to_gpu
-import config
-from stft import real_to_complex, istft, get_cola_constant, overlap_add
+import utils.config as config
+from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
 
 
-from audio_datasets import NoisySpeechFeaturesDataset
+from utils.audio_datasets import NoisySpeechFeaturesDataset
 
 
 def plot_spectrogram(x,y,n_concat):

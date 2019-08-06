@@ -5,7 +5,7 @@ import pickle
 import torch
 from torch.utils.data import Dataset
 
-from utilities import (load_hdf5)
+from utils.utilities import load_hdf5
 
 class NoisySpeechFeaturesDataset(Dataset):
     ''' Dataset for noisy speech features only '''
