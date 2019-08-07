@@ -18,6 +18,7 @@
     "python.testing.unittestArgs": [
         "-v",
         "-s", "./test",
+        "-t", "${workspaceFolder}",
         "-p", "*test*.py"
     ],
     "python.formatting.provider": "autopep8",

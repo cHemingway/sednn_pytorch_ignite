@@ -4,8 +4,8 @@ import torch
 import sys, os
 sys.path.insert(1, os.path.join(sys.path[0], '../utils'))
 
-from audio_datasets import NoisySpeechFeaturesDataset
-from utilities import load_hdf5
+from pytorch.audio_datasets import NoisySpeechFeaturesDataset
+from utils.utilities import load_hdf5
 
 import unittest   # The test framework
 
