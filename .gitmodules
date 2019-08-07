@@ -1,0 +1,4 @@
+[submodule "MRCG_python"]
+	path = MRCG_python
+	url = git@github.com:cHemingway/MRCG_python.git
+	branch = master
