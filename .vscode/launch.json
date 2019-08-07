@@ -28,6 +28,23 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "pack_features",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/prepare_data.py",
+            "cwd": "${workspaceRoot}",
+            "args": [
+                "pack_features",
+                "--workspace=workspace",
+                "--data_type=test",
+                "--snr=0",
+                "--n_concat=7",
+                "--n_hop=3"
+            ],
+            "redirectOutput": false,
+            "console": "integratedTerminal"
+        },
+        {
             "name": "main_ignite",
             "type": "python",
             "request": "launch",

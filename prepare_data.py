@@ -24,6 +24,7 @@ from utils.utilities import (create_folder, read_audio, write_audio,
     calculate_scaler)
 import utils.config as config
 
+from MRCG_python import MRCG as MRCG
 
 # ! HACK: fix onset of noise to zero
 FIXED_NOISE_ONSET = True
@@ -194,12 +195,19 @@ def calculate_mixture_features(args):
         speech_x = calculate_spectrogram(speech_audio, mode='magnitude')
         noise_x = calculate_spectrogram(noise_audio, mode='magnitude')
 
+        # Extract MRCG
+        mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
+
+        # Save 'extra' features in dict
+        # As original code only uses spectogram
+        extra_features = {'mrcg':mrcg}
+
         # Write out features
         out_feature_path = os.path.join(workspace, 'features', 'spectrogram', 
             data_type, '{}db'.format(int(snr)), '{}.p'.format(out_bare_name))
             
         create_folder(os.path.dirname(out_feature_path))
-        data = [mixed_complx_x, speech_x, noise_x, alpha, out_bare_name]
+        data = [mixed_complx_x, speech_x, noise_x, alpha, extra_features, out_bare_name]
         cPickle.dump(data, open(out_feature_path, 'wb'))
         
 
@@ -293,7 +301,7 @@ def pack_features(args):
         # Load feature. 
         feature_path = os.path.join(feature_dir, name)
         data = cPickle.load(open(feature_path, 'rb'))
-        [mixed_complx_x, speech_x, noise_x, alpha, name] = data
+        [mixed_complx_x, speech_x, noise_x, alpha, extra_features, name] = data
         mixed_x = np.abs(mixed_complx_x)
 
         # Pad start and finish of the spectrogram with boarder values. 
@@ -311,16 +319,19 @@ def pack_features(args):
         y = speech_x_3d[:, (n_concat - 1) // 2, :]
         y = log_sp(y).astype(np.float32) 
         y_all.append(y)
-        
+
+        # TODO MRCG needs to be fetched and cut here to consistent slices        
+        mrcg = extra_features['mrcg']
         
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
-    
+
     # Write out data to hdf5 file. 
     logging.debug("Saving..")
     with h5py.File(hdf5_path, 'w') as hf:
         hf.create_dataset('x', data=x_all)
         hf.create_dataset('y', data=y_all)
+        # TODO add MRCG to dataset
     
     logging.info('Write out to {}'.format(hdf5_path))
     
