@@ -35,6 +35,7 @@ import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
 
 from audio_datasets import NoisySpeechFeaturesDataset
+import wandb
 
 
 def get_models():
@@ -68,6 +69,12 @@ def train(args):
     lr = 1e-5
     device = 'cpu'
 
+    # Initialise W&B, ensuring we remove the tricky "model" attribute from args
+    safe_config = vars(args).copy() # Convert to dictionary and get a copy
+    safe_config.pop('model') # Remove model attribute
+    safe_config.pop('mode') # Remove needless mode attribute, will always be train
+    wandb.init(project="mss_speech_sep_lstm",config=safe_config)
+
     if torch.cuda.is_available():
         device = 'cuda'
     else:
@@ -85,6 +92,9 @@ def train(args):
         
     models_dir = os.path.join(workspace, 'models', '{}db'.format(int(tr_snr)))
 
+    # Save model to cloud when done
+    wandb.save(str(models_dir) + '*.pth')
+
     # Datasets & dataloader
     print("Loading Dataset, Scaling data...")
     train_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
@@ -97,7 +107,7 @@ def train(args):
 
     if torch.cuda.device_count() > 1:
         print(colored('Using {} GPUs'.format(torch.cuda.device_count()),'green'))
-        model = torch.nn.DataParallel(model)
+        model = torch.nn.DataParallel(model).to(device)
     
     # Data loader
     # TODO: setting num_workers > 1 breaks CUDA? Needs restart to fix!
@@ -138,6 +148,11 @@ def train(args):
     date_str = datetime.now().strftime("%H:%M:%S %d:%m:%y")
     tb_logger = TensorboardLogger(os.path.join(workspace, f'tensorboard/{args.model_name}/{date_str}'))
 
+    # Add graph to tensorboard
+    # FIXME Doesnt work
+    # freq_bins = config.window_size // 2 + 1
+    # tb_logger.writer.add_graph(model, torch.zeros(5,5,freq_bins), True)
+
     # Plot spectrogram before/after cleaning
     # TODO plot after!
     n_concat = train_dataset.get_properties()['n_concat']
@@ -157,13 +172,18 @@ def train(args):
                 log_handler=WeightsHistHandler(model),
                 event_name=Events.EPOCH_COMPLETED)
 
+
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_test_results(trainer):
         ''' Show test results every epoch '''
-        evaluator.run(test_loader)
-        metrics = evaluator.state.metrics
-        pbar.log_message("Test Set Results - Epoch: {}  Avg accuracy: {:.2f} Avg loss: {:.2f}"
-            .format(trainer.state.epoch, 0, metrics['loss']))
+        state = evaluator.run(test_loader)
+        metrics = state.metrics
+        loss = metrics['loss']
+        # Show in progress bar
+        pbar.log_message("Test Set Results - Epoch: {}  Avg loss: {:.2f}"
+            .format(trainer.state.epoch, loss))
+        # Show in train set
+        wandb.log({"Test Loss": loss})
 
     # Handler to save checkpoints
     chkpoint_handler = ModelCheckpoint(models_dir, 
@@ -176,6 +196,9 @@ def train(args):
                                     'ig_model': model,
                                     'ig_optimizer': optimizer    
                                 })
+
+    # Watch model with W&B, logging both gradients and parameters
+    wandb.watch(model, log='all')
     
     print(f"Starting training {args.model_name}")
     try:
