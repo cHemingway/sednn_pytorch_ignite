@@ -35,7 +35,7 @@
             "cwd": "${workspaceRoot}",
             "args": [
                 "pack_features",
-                "--workspace=workspace",
+                "--workspace=workspace_full",
                 "--data_type=test",
                 "--snr=0",
                 "--n_concat=7",
@@ -49,12 +49,23 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/pytorch/main_ignite.py",
-            "args": [
-                "train",
+            // "args": [
+            //     "DNN",
+            //     "train",
+            //     "--workspace=workspace",
+            //     "--tr_snr=0",
+            //     "--te_snr=0"
+            // ],
+            "args" : [
+                "DNN",
+                "inference",
                 "--workspace=workspace",
+                "--enhanced_dir=workspace/enh_wavs",
                 "--tr_snr=0",
-                "--te_snr=0"
+                "--te_snr=0",
+                "--n_concat=7"
             ],
+            "justMyCode": false,
             "redirectOutput": false,
             "console": "integratedTerminal"
         },
