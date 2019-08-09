@@ -100,20 +100,22 @@ class LSTM(nn.Module):
         
         hidden_units = 1024
         self.lstm_size = 512
-        self.lstm_layers = 2
         self.lstm_step = 32
 
         # From the paper, "The model consists of
+        # One fully connected layer of size 1024
+        self.fc1 = nn.Linear(freq_bins, hidden_units)
         # Two LSTM layers of 512 units 
-        self.lstm1 = nn.LSTM(freq_bins, self.lstm_size, num_layers=self.lstm_layers, batch_first=True)
+        self.lstm1 = nn.LSTMCell(hidden_units, self.lstm_size)
+        self.lstm2 = nn.LSTMCell(self.lstm_size, self.lstm_size)
         # Output layer, linear
         self.fc3 = nn.Linear(self.lstm_size, freq_bins)
 
 
     def init_hidden(self, x):
-        ''' Reinitialise hidden state of LSTM. Call this once per batch '''
-        h0 = torch.zeros(self.lstm_layers, x.size(0), self.lstm_size).to('cuda')
-        c0 = torch.zeros(self.lstm_layers, x.size(0), self.lstm_size).to('cuda')
+        ''' Reinitialise hidden state of LSTM. Call this once per batch seq '''
+        h0 = torch.zeros(x.size(0), self.lstm_size).to('cuda')
+        c0 = torch.zeros(x.size(0), self.lstm_size).to('cuda')
         return (h0, c0)
         
         
@@ -125,19 +127,17 @@ class LSTM(nn.Module):
         midpoint = (n_concat // 2) + 1
         x = input.select(1,midpoint)
 
-        # Format correctly for LSTM, format (batch,seq_len,input_size) 
-        # We do this by using split, and then pad_sequence to clean up
-        x = x.split(self.lstm_step)
-        x = nn.utils.rnn.pad_sequence(x, batch_first=True)
-        # x = x.reshape(-1, self.lstm_step, freq_bins)
-
-
         # Reset state of LSTM
         h0, c0 = self.init_hidden(x)
+        h1, c1 = self.init_hidden(x)
+        
+        # Fully connected layer
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, p=0.5, training=self.training)
 
-        # LSTM with 2 layers, activation/dropout internal
-        # Therefore we pass in training state in case internal dropout is on
+        # 2 LSTM Layers
         x, _ = self.lstm1(x, (h0, c0))
+        x, _ = self.lstm2(x, (h1, c1))
         # Output layer, linear activation (i.e none)
         x = self.fc3(x)
         
