@@ -63,7 +63,7 @@ def train(args):
     workspace = args.workspace
     tr_snr = args.tr_snr
     te_snr = args.te_snr
-    batch_size = 500
+    batch_size = 224
     lr = 1e-4
     device = 'cpu'
 

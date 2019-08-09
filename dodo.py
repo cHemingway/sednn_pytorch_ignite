@@ -122,12 +122,13 @@ def task_mask_basic_dnn():
                                      CONFIG['n_concat'])
     yield task_gen.tasks()
 
-BASIC2_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" / "DNN2"
+
+LSTM_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" / "LSTM"
 @create_after(executed='prepare_data', target_regex='*.*')
-def task_mask_basic_dnn2():
+def task_mask_lstm():
     task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'],
-                                        "DNN2",
-                                        BASIC2_ENHANCED_DIR,
+                                        "LSTM",
+                                        LSTM_ENHANCED_DIR,
                                         RESULT_DIR,
                                         SCALAR_PATH, PACKED_FEATURE_PATHS,
                                         CONFIG['fulldata'],
@@ -185,11 +186,11 @@ def task_backup_results():
     NUM_WAVS_BACKUP = get_var('wavs_backup', 10)  # Backup 10 clean/noisy files
     MIXED_WAVS_TEST = DATA['mixed'] / 'test'/ f"{CONFIG['test_snr']}db/"
 
-
+    # TODO get backup_list automatically from contents of enhanced_dir
     backup_list = [
         ('segan', SEGAN_ENHANCED_DIR),
         ('basic', BASIC_ENHANCED_DIR),
-        ('basic2',BASIC2_ENHANCED_DIR)
+        ('lstm',LSTM_ENHANCED_DIR)
     ]
 
     # Copy sample files from enhanced dir to sample_dir, saving deps produced

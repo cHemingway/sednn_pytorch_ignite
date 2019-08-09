@@ -49,22 +49,22 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/pytorch/main_ignite.py",
-            // "args": [
-            //     "DNN",
-            //     "train",
-            //     "--workspace=workspace",
-            //     "--tr_snr=0",
-            //     "--te_snr=0"
-            // ],
-            "args" : [
-                "DNN",
-                "inference",
-                "--workspace=workspace",
-                "--enhanced_dir=workspace/enh_wavs",
+            "args": [
+                "LSTM",
+                "train",
+                "--workspace=workspace_full",
                 "--tr_snr=0",
-                "--te_snr=0",
-                "--n_concat=7"
+                "--te_snr=0"
             ],
+            // "args" : [
+            //     "DNN",
+            //     "inference",
+            //     "--workspace=workspace",
+            //     "--enhanced_dir=workspace/enh_wavs",
+            //     "--tr_snr=0",
+            //     "--te_snr=0",
+            //     "--n_concat=7"
+            // ],
             "justMyCode": false,
             "redirectOutput": false,
             "console": "integratedTerminal"
