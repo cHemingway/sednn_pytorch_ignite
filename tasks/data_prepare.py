@@ -54,12 +54,13 @@ class Data_Prepare_creator(object):
 
     def calculate_mixture_features(self, data_type):
         ''' Yields a calculate_mixture_features of data_type '''
+        snr = self.config[f'{data_type}_snr']
         yield {
             'name': f'calculate_mixture_features:{data_type}',
-            'task_dep': [f'prepare_data:create_mixture_csv:{data_type}'],
+            'file_dep': [self.workspace / 'mixture_csvs' / f'{data_type}.csv'],
             'targets': [
-                self.data['mixed']/data_type,
-                self.workspace / "features"/'spectogram'/data_type,
+                 self.data['mixed']/data_type/f'{snr}db',
+                 self.workspace / "features"/'spectrogram'/data_type/f'{snr}db',
             ],
             'actions': [
                 Interactive(
@@ -68,7 +69,7 @@ class Data_Prepare_creator(object):
                     f"--speech_dir={self.data[data_type]['speech']} "
                     f"--noise_dir={self.data[data_type]['noise']} " 
                     f"--data_type={data_type} "
-                    f"--snr={self.config[f'{data_type}_snr']}"
+                    f"--snr={snr}"
                 )
             ],
             'clean': True,
