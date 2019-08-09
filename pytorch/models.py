@@ -98,9 +98,10 @@ class LSTM(nn.Module):
         
         super().__init__()
         
+        # TODO these should be passed in from main
         hidden_units = 1024
         self.lstm_size = 512
-        self.lstm_step = 32
+        self.lstm_timestep = 64 # Timestep of LSTM, and size of mini_batch
 
         # From the paper, "The model consists of
         # One fully connected layer of size 1024
@@ -112,10 +113,10 @@ class LSTM(nn.Module):
         self.fc3 = nn.Linear(self.lstm_size, freq_bins)
 
 
-    def init_hidden(self, x):
+    def init_hidden(self, input_size):
         ''' Reinitialise hidden state of LSTM. Call this once per batch seq '''
-        h0 = torch.zeros(x.size(0), self.lstm_size).to('cuda')
-        c0 = torch.zeros(x.size(0), self.lstm_size).to('cuda')
+        h0 = torch.zeros(input_size, self.lstm_size).to('cuda')
+        c0 = torch.zeros(input_size, self.lstm_size).to('cuda')
         return (h0, c0)
         
         
@@ -125,20 +126,39 @@ class LSTM(nn.Module):
         # Select only middle bin, effectively ignoring n_concat
         # We do this by "cutting out" the n_concat axis
         midpoint = (n_concat // 2) + 1
-        x = input.select(1,midpoint)
+        batch = input.select(1,midpoint)
 
-        # Reset state of LSTM
-        h0, c0 = self.init_hidden(x)
-        h1, c1 = self.init_hidden(x)
-        
-        # Fully connected layer
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=0.5, training=self.training)
+        # Reset state of LSTM per minibatch
+        h0, c0 = self.init_hidden(self.lstm_timestep)
+        h1, c1 = self.init_hidden(self.lstm_timestep)
 
-        # 2 LSTM Layers
-        x, _ = self.lstm1(x, (h0, c0))
-        x, _ = self.lstm2(x, (h1, c1))
-        # Output layer, linear activation (i.e none)
-        x = self.fc3(x)
-        
-        return x
+        # Split input into minibatches
+        # Note: The last minibatch may be shorter if batch is not evenly divisable
+        minibatches = batch.split(self.lstm_timestep)
+
+        output = []
+
+        for x in minibatches:
+            if x.size(0) != self.lstm_timestep:
+                # HACK: Zero-Pad the shorter final minibatch
+                pad_size = self.lstm_timestep - x.size(0)
+                x = torch.nn.functional.pad(x, (0,0,0,pad_size))
+
+            # Fully connected layer
+            x = F.relu(self.fc1(x))
+            x = F.dropout(x, p=0.2, training=self.training)
+            # 2 LSTM Layers
+            h0, c0 = self.lstm1(x, (h0, c0))
+            x = F.dropout(h0, p=0.2, training=self.training)
+            h1, c1 = self.lstm2(x, (h1, c1))
+            x = F.dropout(h1, p=0.2, training=self.training)
+            # Output layer, linear activation (i.e none)
+            x = self.fc3(x)
+
+            output.append(x)
+            
+        # Concat output together
+        output = torch.cat(output)
+        # Remove the padding from the end
+        output = output[:batch_size,:]
+        return output # Return concatanated version
