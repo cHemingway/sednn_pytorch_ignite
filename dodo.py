@@ -109,17 +109,30 @@ def task_prepare_data():
     yield task_gen.tasks()
 
 
-BASIC_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" /"basic"
-
+BASIC_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" / "DNN"
 @create_after(executed='prepare_data', target_regex='*.*')
 def task_mask_basic_dnn():
     task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'], 
+                                     "DNN",
                                      BASIC_ENHANCED_DIR,
                                      RESULT_DIR,
                                      SCALAR_PATH, PACKED_FEATURE_PATHS,
                                      CONFIG['fulldata'],
                                      CONFIG['train_snr'], CONFIG['test_snr'],
                                      CONFIG['n_concat'])
+    yield task_gen.tasks()
+
+BASIC2_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" / "DNN2"
+@create_after(executed='prepare_data', target_regex='*.*')
+def task_mask_basic_dnn2():
+    task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'],
+                                        "DNN2",
+                                        BASIC2_ENHANCED_DIR,
+                                        RESULT_DIR,
+                                        SCALAR_PATH, PACKED_FEATURE_PATHS,
+                                        CONFIG['fulldata'],
+                                        CONFIG['train_snr'], CONFIG['test_snr'],
+                                        CONFIG['n_concat'])
     yield task_gen.tasks()
 
 
@@ -175,7 +188,8 @@ def task_backup_results():
 
     backup_list = [
         ('segan', SEGAN_ENHANCED_DIR),
-        ('basic', BASIC_ENHANCED_DIR)
+        ('basic', BASIC_ENHANCED_DIR),
+        ('basic2',BASIC2_ENHANCED_DIR)
     ]
 
     # Copy sample files from enhanced dir to sample_dir, saving deps produced

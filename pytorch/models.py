@@ -1,3 +1,7 @@
+''' Models for main_ignite.py. 
+Every model takes n_concat, freq_bins as init arguments
+New models are detected automatically '''
+
 import math
 
 import torch
@@ -54,7 +58,7 @@ def init_bn(bn):
 class DNN(nn.Module):
     def __init__(self, n_concat, freq_bins):
         
-        super(DNN, self).__init__()
+        super().__init__()
         
         hidden_units = 2048
         
@@ -86,3 +90,40 @@ class DNN(nn.Module):
         x = self.fc4(x)
         
         return x
+
+
+class DNN2(nn.Module):
+        def __init__(self, n_concat, freq_bins):
+            
+            super().__init__()
+            
+            hidden_units = 1024
+            
+            self.fc1 = nn.Linear(n_concat * freq_bins, hidden_units)
+            self.fc2 = nn.Linear(hidden_units, hidden_units)
+            self.fc3 = nn.Linear(hidden_units, hidden_units)
+            self.fc4 = nn.Linear(hidden_units, freq_bins)
+            
+            self.init_weights()
+            
+        def init_weights(self):
+            
+            init_layer(self.fc1)
+            init_layer(self.fc2)
+            init_layer(self.fc3)
+            init_layer(self.fc4)
+            
+        def forward(self, input):
+            
+            (batch_size, n_concat, freq_bins) = input.shape
+            x = input.view(batch_size, n_concat * freq_bins)
+            
+            x = F.relu(self.fc1(x))
+            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.relu(self.fc2(x))
+            x = F.dropout(x, p=0.5, training=self.training)
+            x = F.relu(self.fc3(x))
+            x = F.dropout(x, p=0.5, training=self.training)
+            x = self.fc4(x)
+            
+            return x

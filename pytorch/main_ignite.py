@@ -4,6 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 import argparse
 import pickle
+import inspect
+import pathlib
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,12 +28,23 @@ from tqdm import tqdm
 from utils.utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 
     pad_with_border, log_sp, mat_2d_to_3d, inverse_scale, get_stft_window_func, 
     write_audio, read_audio, calculate_spectrogram)
-from models import DNN, move_data_to_gpu
+import models
+from models import move_data_to_gpu
 import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
 
 from audio_datasets import NoisySpeechFeaturesDataset
 
+
+def get_models():
+    ''' Get dict 'name':value of all models by inspecting models.py '''
+    # is_module uses short circuiting to check if it is a class _before_ checking
+    # if it is a subclass, as issubclass throws exception if passed something that
+    # is _not_ a class
+    is_module = lambda x : inspect.isclass(x) and issubclass(x,torch.nn.Module)
+    # Returns [(key,value), (key,value)], so turn into dict
+    models_list =  inspect.getmembers(models,predicate=is_module)
+    return dict(models_list)
 
 def plot_spectrogram(x,y,n_concat):
     ''' Given Tensors x,y, returns a figure of the first 1000 items '''
@@ -76,9 +89,10 @@ def train(args):
     train_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
     test_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
 
-    # Model
+    # Load Model and pass in properties of dataset
+    print(f"Using Model {args.model_name}")
     data_prop = train_dataset.get_properties()
-    model = DNN(**data_prop)
+    model = args.model(**data_prop)
 
     if torch.cuda.device_count() > 1:
         print(colored('Using {} GPUs'.format(torch.cuda.device_count()),'green'))
@@ -120,9 +134,10 @@ def train(args):
     pbar.attach(trainer, ['loss'])
 
     # Tensorboard attach, training loss and optimizer params
-    tb_logger = TensorboardLogger(os.path.join(workspace, 'tensorboard'))
+    tb_logger = TensorboardLogger(os.path.join(workspace, f'tensorboard/{args.model_name}'))
 
     # Plot spectrogram before/after cleaning
+    # TODO plot after!
     n_concat = train_dataset.get_properties()['n_concat']
     fig = plot_spectrogram(train_dataset.x,train_dataset.y,n_concat)
     tb_logger.writer.add_figure('Spectrogram',fig,global_step=0,close=True)
@@ -150,7 +165,7 @@ def train(args):
 
     # Handler to save checkpoints
     chkpoint_handler = ModelCheckpoint(models_dir, 
-                                        filename_prefix="chkpoint_", 
+                                        filename_prefix=f"{args.model_name}_chkpoint_", 
                                         save_interval=2, # Save every 2nd epoch
                                         require_empty=False # Overwrite
                                         )
@@ -160,7 +175,7 @@ def train(args):
                                     'ig_optimizer': optimizer    
                                 })
     
-    print("Starting training")
+    print(f"Starting training {args.model_name}")
     try:
         trainer.run(train_loader, max_epochs=10)
     except KeyboardInterrupt:
@@ -211,13 +226,15 @@ def inference(args):
     scaler_path = os.path.join(workspace, 'packed_features', 'spectrogram', 
         'train', '{}db'.format(int(tr_snr)), 'scaler.p')
     
+
+    # TODO model path changes when number of epochs change
     model_path = os.path.join(workspace, 'models', '{}db'.format(int(tr_snr)), 
-        'chkpoint__ig_model_10.pth')
+        f'{args.model_name}_chkpoint__ig_model_10.pth')
         
     enh_audios_dir = args.enhanced_dir
 
     # Load model
-    model = DNN(n_concat, freq_bins)   
+    model = args.model(n_concat, freq_bins)   
     state_dict = torch.load(model_path) 
 
     # Hack to remove results of DataParallel
@@ -248,7 +265,13 @@ def inference(args):
         # Load feature
         feature_path = os.path.join(features_dir, audio_name)
         data = pickle.load(open(feature_path, 'rb'))
-        [mixed_cmplx_x, speech_x, noise_x, alpha, na] = data
+        # Hack, skip extra features if not given
+        if len(data) == 6:
+            [mixed_cmplx_x, speech_x, noise_x, alpha, extra_features, name] = data
+        else:
+            [mixed_cmplx_x, speech_x, noise_x, alpha, name] = data
+            extra_features = None
+
         
         mixed_x = np.abs(mixed_cmplx_x)
         
@@ -292,7 +315,13 @@ def inference(args):
 
 if __name__ == '__main__':
 
+    models = get_models() # Get dict of models in models.py
+
     parser = argparse.ArgumentParser(description='')
+
+    parser.add_argument("model_name", help="Model from models.py to use",
+                        choices=models.keys())
+
     subparsers = parser.add_subparsers(dest='mode')
 
     parser_train = subparsers.add_parser('train')
@@ -308,7 +337,9 @@ if __name__ == '__main__':
     parser_inference.add_argument('--n_concat', type=int, required=True)
 
     args = parser.parse_args()
-    print(args)
+
+    # Add model to arguments
+    args.model = models[args.model_name]
 
     if args.mode == 'train':
         train(args)

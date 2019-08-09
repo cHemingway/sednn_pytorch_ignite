@@ -14,6 +14,7 @@ class MASK_DNN_basic_creator(object):
     ''' Task creator object for existing mask based DNN '''
 
     def __init__(self, data, workspace_dir: pathlib.Path,
+                 model_name: str,
                  enhanced_dir: pathlib.Path,
                  result_dir: pathlib.Path,
                  scalar_path, packed_feature_paths,
@@ -22,6 +23,7 @@ class MASK_DNN_basic_creator(object):
 
         self.data = data
         self.workspace = workspace_dir
+        self.model_name = model_name
         self.enhanced_dir = enhanced_dir
         self.scalar_path = scalar_path
         self.packed_feature_paths = packed_feature_paths
@@ -32,7 +34,7 @@ class MASK_DNN_basic_creator(object):
         self.n_concat = n_concat
 
         self.model_path = self.workspace / 'models' / f'{self.train_snr}db' \
-            / f'chkpoint__ig_model_10.pth'
+            / f'{self.model_name}_chkpoint__ig_model_10.pth'
 
         
 
@@ -44,7 +46,7 @@ class MASK_DNN_basic_creator(object):
                 self.model_path
             ],
             'actions': [Interactive(
-                f"python pytorch/main_ignite.py train "
+                f"python pytorch/main_ignite.py {self.model_name} train "
                 f"--workspace={self.workspace} "
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr}"
             )],
@@ -61,7 +63,7 @@ class MASK_DNN_basic_creator(object):
                 self.enhanced_dir
             ],
             'actions': [Interactive(
-                f"python pytorch/main_ignite.py inference "
+                f"python pytorch/main_ignite.py {self.model_name} inference "
                 f"--workspace={self.workspace} "
                 f"--enhanced_dir={self.enhanced_dir} "
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr} "
@@ -74,9 +76,9 @@ class MASK_DNN_basic_creator(object):
     def calculate_pesq(self):
         ''' Wrapper around calculate_pesq with correct parameters '''
         task = tasks.evaluate.calculate_pesq(self.workspace,
-                                                self.result_dir/"mask_basic_dnn_pesq_results.txt",
-                                                self.data, self.enhanced_dir,
-                                                self.test_snr)
+                                             self.result_dir/f"{self.model_name}_pesq_results.txt",
+                                             self.data, self.enhanced_dir,
+                                             self.test_snr)
         task['name'] = 'calculate_pesq'
         clean_wav_files = list(self.enhanced_dir.rglob("*.wav"))
         task['file_dep'] = clean_wav_files
@@ -87,7 +89,7 @@ class MASK_DNN_basic_creator(object):
     def calculate_bss_stoi(self):
         ''' Wrapper around calculate_bss_stoi with correct parameters '''
         task = tasks.evaluate.calculate_bss_stoi(
-            self.result_dir/"mask_basic_dnn_bss_stoi.csv",
+            self.result_dir/f"{self.model_name}_bss_stoi.csv",
             self.data,
             self.enhanced_dir)
         task['name'] = 'calculate_bss_stoi'
