@@ -195,12 +195,14 @@ def calculate_mixture_features(args):
         speech_x = calculate_spectrogram(speech_audio, mode='magnitude')
         noise_x = calculate_spectrogram(noise_audio, mode='magnitude')
 
-        # Extract MRCG
-        mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
-
         # Save 'extra' features in dict
         # As original code only uses spectogram
-        extra_features = {'mrcg':mrcg}
+        extra_features = dict()
+        
+        # Extract extra
+        if args.mrcg:
+            mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
+            extra_features = {'mrcg':mrcg}
 
         # Write out features
         out_feature_path = os.path.join(workspace, 'features', 'spectrogram', 
@@ -415,6 +417,7 @@ if __name__ == '__main__':
     parser_calculate_mixture_features.add_argument('--noise_dir', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--data_type', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--snr', type=float, required=True)
+    parser_calculate_mixture_features.add_argument('--mrcg', action='store_true', default=False)
     
     parser_pack_features = subparsers.add_parser('pack_features')
     parser_pack_features.add_argument('--workspace', type=str, required=True)
