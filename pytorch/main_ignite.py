@@ -6,6 +6,7 @@ import argparse
 import pickle
 import inspect
 import pathlib
+from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -63,8 +64,8 @@ def train(args):
     workspace = args.workspace
     tr_snr = args.tr_snr
     te_snr = args.te_snr
-    batch_size = 224
-    lr = 1e-4
+    batch_size = 1000
+    lr = 1e-5
     device = 'cpu'
 
     if torch.cuda.is_available():
@@ -134,7 +135,8 @@ def train(args):
     pbar.attach(trainer, ['loss'])
 
     # Tensorboard attach, training loss and optimizer params
-    tb_logger = TensorboardLogger(os.path.join(workspace, f'tensorboard/{args.model_name}'))
+    date_str = datetime.now().strftime("%H:%M:%S %d:%m:%y")
+    tb_logger = TensorboardLogger(os.path.join(workspace, f'tensorboard/{args.model_name}/{date_str}'))
 
     # Plot spectrogram before/after cleaning
     # TODO plot after!
