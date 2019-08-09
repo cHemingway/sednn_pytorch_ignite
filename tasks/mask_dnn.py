@@ -9,6 +9,8 @@ from doit.tools import Interactive
 from tasks.utils import get_source_files
 import tasks.evaluate
 
+train_args = get_var('train_args', '') # Extra arguments to pass during training
+
 
 class MASK_DNN_basic_creator(object):
     ''' Task creator object for existing mask based DNN '''
@@ -48,7 +50,8 @@ class MASK_DNN_basic_creator(object):
             'actions': [Interactive(
                 f"python pytorch/main_ignite.py {self.model_name} train "
                 f"--workspace={self.workspace} "
-                f"--tr_snr={self.train_snr} --te_snr={self.test_snr}"
+                f"--tr_snr={self.train_snr} --te_snr={self.test_snr} " +
+                train_args
             )],
         }
 

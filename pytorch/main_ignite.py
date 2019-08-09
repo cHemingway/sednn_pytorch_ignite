@@ -65,8 +65,8 @@ def train(args):
     workspace = args.workspace
     tr_snr = args.tr_snr
     te_snr = args.te_snr
-    batch_size = 1000
-    lr = 1e-5
+    batch_size = args.batch_size
+    lr = args.lr
     device = 'cpu'
 
     # Initialise W&B, ensuring we remove the tricky "model" attribute from args
@@ -202,7 +202,7 @@ def train(args):
     
     print(f"Starting training {args.model_name}")
     try:
-        trainer.run(train_loader, max_epochs=10)
+        trainer.run(train_loader, max_epochs=args.max_epochs)
     except KeyboardInterrupt:
         print(colored("Interrupted, exiting..",'red'))
     else:
@@ -211,6 +211,8 @@ def train(args):
     finally:
         # We need to close the logger with we are done
         tb_logger.close()
+
+    # TODO run inference and upload PESQ, STOI results
 
 
 def inference(args):
@@ -353,6 +355,9 @@ if __name__ == '__main__':
     parser_train.add_argument('--workspace', type=str, required=True)
     parser_train.add_argument('--tr_snr', type=float, required=True)
     parser_train.add_argument('--te_snr', type=float, required=True)
+    parser_train.add_argument('--lr', type=float, default=1e-5)
+    parser_train.add_argument('--batch_size', type=int, default=1000)
+    parser_train.add_argument('--max_epochs', type=int, default=10)
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
