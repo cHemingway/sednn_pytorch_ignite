@@ -73,6 +73,7 @@ def train(args):
     safe_config = vars(args).copy() # Convert to dictionary and get a copy
     safe_config.pop('model') # Remove model attribute
     safe_config.pop('mode') # Remove needless mode attribute, will always be train
+    safe_config.pop('loss') # Remove loss attribute
     wandb.init(project="mss_speech_sep_lstm",config=safe_config)
 
     if torch.cuda.is_available():
@@ -125,8 +126,8 @@ def train(args):
     # Optimizer
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # Loss function, mean average error (L1)
-    loss = F.l1_loss
+    # Loss function, specified by args
+    loss = args.loss
 
     # Setup trainer and evalduator
     trainer = create_supervised_trainer(model, optimizer, loss, device=device)
@@ -344,6 +345,11 @@ if __name__ == '__main__':
 
     models = get_models() # Get dict of models in models.py
 
+    loss_functions = {
+        'L1': F.l1_loss,
+        'MSE': F.mse_loss
+    }
+
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument("model_name", help="Model from models.py to use",
@@ -358,6 +364,8 @@ if __name__ == '__main__':
     parser_train.add_argument('--lr', type=float, default=1e-5)
     parser_train.add_argument('--batch_size', type=int, default=1000)
     parser_train.add_argument('--max_epochs', type=int, default=10)
+    parser_train.add_argument('--loss_func', dest="loss_name", 
+                              choices=loss_functions)
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
@@ -370,8 +378,10 @@ if __name__ == '__main__':
 
     # Add model to arguments
     args.model = models[args.model_name]
+    
 
     if args.mode == 'train':
+        args.loss = loss_functions[args.loss_name]
         train(args)
     elif args.mode == 'inference':
         inference(args)

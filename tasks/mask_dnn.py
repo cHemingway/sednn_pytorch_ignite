@@ -3,7 +3,7 @@
 import pathlib
 
 from doit import get_var, create_after
-from doit.tools import Interactive
+from doit.tools import Interactive, config_changed
 
 
 from tasks.utils import get_source_files
@@ -53,6 +53,7 @@ class MASK_DNN_basic_creator(object):
                 f"--tr_snr={self.train_snr} --te_snr={self.test_snr} " +
                 train_args
             )],
+            'uptodate': [config_changed(train_args)]
         }
 
     @create_after(executed='calculate_mixture_features', target_regex='*.wav')
