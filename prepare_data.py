@@ -292,7 +292,7 @@ def pack_features(args):
     x_all = []  # (n_segs, n_concat, n_freq)
     y_all = []  # (n_segs, n_freq)
     
-    
+
     # Load all features
     names = os.listdir(feature_dir)
     
@@ -301,7 +301,13 @@ def pack_features(args):
         # Load feature. 
         feature_path = os.path.join(feature_dir, name)
         data = cPickle.load(open(feature_path, 'rb'))
-        [mixed_complx_x, speech_x, noise_x, alpha, extra_features, name] = data
+        # Hack, skip extra features if not given
+        if len(data) == 6:
+            [mixed_complx_x, speech_x, noise_x, alpha, extra_features, name] = data
+        else:
+            [mixed_complx_x, speech_x, noise_x, alpha, name] = data
+            extra_features = None
+
         mixed_x = np.abs(mixed_complx_x)
 
         # Pad start and finish of the spectrogram with boarder values. 
@@ -320,8 +326,12 @@ def pack_features(args):
         y = log_sp(y).astype(np.float32) 
         y_all.append(y)
 
-        # TODO MRCG needs to be fetched and cut here to consistent slices        
-        mrcg = extra_features['mrcg']
+        # TODO MRCG needs to be fetched and cut here to consistent slices
+        if extra_features:    
+            mrcg = extra_features['mrcg']
+        # Need to split into _components_, then slice
+        # Might mean delta() needs to get changed as well?
+        # Would have been easier if audio was sliced at the beginning tbh
         
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
