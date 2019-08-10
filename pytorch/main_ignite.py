@@ -30,7 +30,6 @@ from utils.utilities import (create_folder, load_hdf5, scale, np_mean_absolute_e
     pad_with_border, log_sp, mat_2d_to_3d, inverse_scale, get_stft_window_func, 
     write_audio, read_audio, calculate_spectrogram)
 import models
-from models import move_data_to_gpu
 import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
 
@@ -216,6 +215,65 @@ def train(args):
     # TODO run inference and upload PESQ, STOI results
 
 
+def infer_test_audio(device, model, features_dir, audio_name, n_concat, scaler):
+    ''' Run inference on an audio file using model '''
+
+    window_size = config.window_size
+    freq_bins = window_size // 2 + 1
+    window = get_stft_window_func(config.window_type)(window_size)
+    overlap = config.overlap
+    hop_size = window_size - overlap
+
+    # Load feature
+    feature_path = os.path.join(features_dir, audio_name)
+    data = pickle.load(open(feature_path, 'rb'))
+    # Hack, skip extra features if not given
+    if len(data) == 6:
+        [mixed_cmplx_x, speech_x, noise_x, alpha, extra_features, name] = data
+    else:
+        [mixed_cmplx_x, speech_x, noise_x, alpha, name] = data
+        extra_features = None
+
+    
+    mixed_x = np.abs(mixed_cmplx_x)
+    
+    # Process data
+    n_pad = (n_concat - 1) // 2
+    mixed_x = pad_with_border(mixed_x, n_pad)
+    mixed_x = log_sp(mixed_x)
+    speech_x = log_sp(speech_x)
+    
+    # Scale data
+    mixed_x = scale(mixed_x, scaler)
+    
+    # Cut input spectrogram to 3D segments with n_concat
+    mixed_x_3d = mat_2d_to_3d(mixed_x, agg_num=n_concat, hop=1)
+    
+    # Covert data to torch.Tensor
+    mixed_x_3d = torch.Tensor(mixed_x_3d).to(device)
+    
+    # Predict
+    prediction = model(mixed_x_3d)
+
+    # Move back to CPU
+    prediction = prediction.data.cpu().numpy()
+    
+    # Inverse scale
+    mixed_x = inverse_scale(mixed_x, scaler)
+    prediction = inverse_scale(prediction, scaler)
+    
+    # Recover enhanced wav
+    prediction_sp = np.exp(prediction)
+    complex_sp = real_to_complex(prediction_sp, mixed_cmplx_x)
+    frames = istft(complex_sp)
+    
+    # Overlap add
+    cola_constant = get_cola_constant(hop_size, window)
+    enh_audio = overlap_add(frames, hop_size, cola_constant)
+    
+    return enh_audio
+
+
 def inference(args):
     """Inference all test data, write out recovered wavs to disk. 
     
@@ -234,15 +292,12 @@ def inference(args):
     tr_snr = args.tr_snr
     te_snr = args.te_snr
     n_concat = args.n_concat
-    data_type = 'test'
-    
-    window_size = config.window_size
-    overlap = config.overlap
-    hop_size = window_size - overlap
-    cuda = torch.cuda.is_available()
-    freq_bins = window_size // 2 + 1
+    data_type = 'test'    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     sample_rate = config.sample_rate
-    window = get_stft_window_func(config.window_type)(window_size)
+    window_size = config.window_size
+    freq_bins = window_size // 2 + 1
+
     
     # Paths
     mixed_audios_dir = os.path.join(workspace, 'mixed_audios', data_type, 
@@ -276,70 +331,26 @@ def inference(args):
     
     model.load_state_dict(new_state_dict)
     
-    # Convert model to CUDA, but single threaded
-    if cuda:
-        model.cuda()
+    # Move model to device if needed
+    model.to(device)
     
     # Load scaler
     scaler = pickle.load(open(scaler_path, 'rb'))
     
-    feature_names = os.listdir(features_dir)
+    # Get list of audio names
+    audio_names = os.listdir(features_dir)
 
     # Create output folder
     create_folder(enh_audios_dir)
 
-    for audio_name in tqdm(feature_names):
-    
-        # Load feature
-        feature_path = os.path.join(features_dir, audio_name)
-        data = pickle.load(open(feature_path, 'rb'))
-        # Hack, skip extra features if not given
-        if len(data) == 6:
-            [mixed_cmplx_x, speech_x, noise_x, alpha, extra_features, name] = data
-        else:
-            [mixed_cmplx_x, speech_x, noise_x, alpha, name] = data
-            extra_features = None
+    for name in tqdm(audio_names):
+        # Infer the audio
+        enh_audio = infer_test_audio(device, model, features_dir, name, n_concat, scaler)
 
-        
-        mixed_x = np.abs(mixed_cmplx_x)
-        
-        # Process data
-        n_pad = (n_concat - 1) // 2
-        mixed_x = pad_with_border(mixed_x, n_pad)
-        mixed_x = log_sp(mixed_x)
-        speech_x = log_sp(speech_x)
-        
-        # Scale data
-        mixed_x = scale(mixed_x, scaler)
-        
-        # Cut input spectrogram to 3D segments with n_concat
-        mixed_x_3d = mat_2d_to_3d(mixed_x, agg_num=n_concat, hop=1)
-        
-        # Move data to GPU
-        mixed_x_3d = move_data_to_gpu(mixed_x_3d, cuda)
-        
-        # Predict
-        prediction = model(mixed_x_3d)
-        prediction = prediction.data.cpu().numpy()
-        
-        # Inverse scale
-        mixed_x = inverse_scale(mixed_x, scaler)
-        prediction = inverse_scale(prediction, scaler)
-        
-        # Recover enhanced wav
-        prediction_sp = np.exp(prediction)
-        complex_sp = real_to_complex(prediction_sp, mixed_cmplx_x)
-        frames = istft(complex_sp)
-        
-        # Overlap add
-        cola_constant = get_cola_constant(hop_size, window)
-        enh_audio = overlap_add(frames, hop_size, cola_constant)
-        
         # Write out enhanced wav
-        bare_name = os.path.splitext(audio_name)[0]
+        bare_name = os.path.splitext(name)[0]
         out_path = os.path.join(enh_audios_dir, '{}.enh.wav'.format(bare_name))
         write_audio(out_path, enh_audio, sample_rate)
-
 
 if __name__ == '__main__':
 
@@ -365,7 +376,7 @@ if __name__ == '__main__':
     parser_train.add_argument('--batch_size', type=int, default=1000)
     parser_train.add_argument('--max_epochs', type=int, default=10)
     parser_train.add_argument('--loss_func', dest="loss_name", 
-                              choices=loss_functions)
+                              choices=loss_functions, default='MSE')
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
