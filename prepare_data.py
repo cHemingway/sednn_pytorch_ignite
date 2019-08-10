@@ -61,52 +61,52 @@ def create_mixture_csv(args):
     speech_names = [name for name in os.listdir(speech_dir) if name.lower().endswith('.wav')]
     noise_names = [name for name in os.listdir(noise_dir) if name.lower().endswith('.wav')]
     
-    f = open(out_csv_path, 'w')
-    f.write('{}\t{}\t{}\t{}\n'.format('speech_name', 'noise_name', 'noise_onset', 'noise_offset'))
-    
-    for speech_na in tqdm(speech_names,desc="Creating Mixture CSV"):
-        
-        # Read speech
-        speech_path = os.path.join(speech_dir, speech_na)
-        (speech_audio, _) = read_audio(speech_path)
-        len_speech = len(speech_audio)
-        
-        # For training data, mix each speech with randomly picked #magnification noises
-        if data_type == 'train':
-            selected_noise_names = rs.choice(noise_names, size=magnification, replace=False)
+    # Names for CSV File
+    fieldnames = ['speech_name', 'noise_name', 'noise_onset', 'noise_offset']
+
+    with open(out_csv_path, 'w') as f:
+        writer = csv.writer(f, dialect='excel', delimiter='\t')
+        writer.writerow(fieldnames) # Write header
+
+        for speech_na in tqdm(speech_names,desc="Creating Mixture CSV"):
             
-        # For test data, mix each speech with all noises
-        elif data_type == 'test':
-            selected_noise_names = noise_names
-        else:
-            raise Exception('data_type must be train | test!')
-
-        # Mix one speech with different noises many times
-        for noise_na in tqdm(selected_noise_names,disable=(len(selected_noise_names)<100)):
-            noise_path = os.path.join(noise_dir, noise_na)
-            (noise_audio, _) = read_audio(noise_path)
+            # Read speech
+            speech_path = os.path.join(speech_dir, speech_na)
+            (speech_audio, _) = read_audio(speech_path)
+            len_speech = len(speech_audio)
             
-            len_noise = len(noise_audio)
-
-            if FIXED_NOISE_ONSET:
-                noise_onset = 0
-                nosie_offset = len_speech
-
+            # For training data, mix each speech with randomly picked #magnification noises
+            if data_type == 'train':
+                selected_noise_names = rs.choice(noise_names, size=magnification, replace=False)
+                
+            # For test data, mix each speech with all noises
+            elif data_type == 'test':
+                selected_noise_names = noise_names
             else:
-                # If noise shorter than speech then noise will be repeated in calculating features
-                if len_noise <= len_speech:
+                raise Exception('data_type must be train | test!')
+
+            # Mix one speech with different noises many times
+            for noise_na in tqdm(selected_noise_names,disable=(len(selected_noise_names)<100)):
+                noise_path = os.path.join(noise_dir, noise_na)
+                (noise_audio, _) = read_audio(noise_path)
+                len_noise = len(noise_audio)
+
+                if FIXED_NOISE_ONSET:
                     noise_onset = 0
                     nosie_offset = len_speech
-                    
-                # If noise longer than speech then randomly select a segment of noise
-                else:
-                    noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
-                    nosie_offset = noise_onset + len_speech
-            
 
-            f.write('{}\t{}\t{}\t{}\n'.format(speech_na, noise_na, noise_onset, nosie_offset))
-    
-    f.close()
+                else:
+                    # If noise shorter than speech then noise will be repeated in calculating features
+                    if len_noise <= len_speech:
+                        noise_onset = 0
+                        nosie_offset = len_speech
+                        
+                    # If noise longer than speech then randomly select a segment of noise
+                    else:
+                        noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
+                        nosie_offset = noise_onset + len_speech
+                # Write out to CSV finally
+                writer.writerow([speech_na, noise_na, noise_onset, nosie_offset])
     
     logging.info('Write {} mixture csv to {}!'.format(data_type, out_csv_path))
     
