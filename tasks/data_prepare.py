@@ -29,7 +29,8 @@ class Data_Prepare_creator(object):
         ''' Yields a create_mixture_csv task of data_type '''
         yield {
             'name': f'create_mixture_csv:{data_type}',
-            'file_dep':  self.data_files + get_source_files("utils"),
+            'file_dep':  self.data_files + 
+                         get_source_files("utils") + ["prepare_data.py"],
             'task_dep': ['make_workspace'],
             # Using pathlib slash '/' operator
             'targets': [
