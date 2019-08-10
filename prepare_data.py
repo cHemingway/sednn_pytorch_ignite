@@ -295,6 +295,19 @@ def additive_mixing(s, n):
     s *= alpha
     n *= alpha
     return mixed_audio, s, n, alpha
+
+
+def adjust_noise_length(noise_audio, onset, offset, speech_audio):
+    ''' Pads or truncates noise audio to match length of speech audio '''
+    if noise_audio.size < speech_audio.size:
+        # Repeat noise to the same length as speech
+        n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
+        noise_audio_repeat = np.tile(noise_audio, n_repeat)
+        noise_audio = noise_audio_repeat[0 : len(speech_audio)]
+    else:
+        # Truncate noise to the same length as speech
+        noise_audio = noise_audio[onset: offset]
+    return noise_audio
     
     
 ###
