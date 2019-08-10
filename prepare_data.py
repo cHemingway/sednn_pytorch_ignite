@@ -29,6 +29,8 @@ from MRCG_python import MRCG as MRCG
 # ! HACK: fix onset of noise to zero
 FIXED_NOISE_ONSET = True
 
+
+## Utility functions
 def get_audio_length(audio_path):
     (audio, _) = read_audio(audio_path)
     return len(audio)
@@ -196,16 +198,17 @@ def calculate_mixture_features(args):
         noise_path = os.path.join(noise_dir, pair['noise_name'])
         (noise_audio, _) = read_audio(noise_path, target_fs=sample_rate)
         
-        # Repeat noise to the same length as speech
-        if noise_audio.size < speech_audio.size:
-            n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
-            noise_audio_repeat = np.tile(noise_audio, n_repeat)
-            noise_audio = noise_audio_repeat[0 : len(speech_audio)]
-            
-        # Truncate noise to the same length as speech
-        else:
-            noise_audio = noise_audio[noise_onset: noise_offset]
-        
+        # Trim/repeat noise
+        noise_audio = adjust_noise_length(noise_audio, noise_onset, noise_offset, speech_audio)
+
+        # Read extra speech audio
+        # extra_speech = get_extras(pair)
+        # for each extra speech
+        #     load
+        #     trim / repeat
+        #     scale somehow?
+        #     add into noise audio? 
+
         # Scale speech to given snr
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
         speech_audio *= scaler
@@ -295,6 +298,19 @@ def additive_mixing(s, n):
     s *= alpha
     n *= alpha
     return mixed_audio, s, n, alpha
+
+
+def adjust_noise_length(noise_audio, onset, offset, speech_audio):
+    ''' Pads or truncates noise audio to match length of speech audio '''
+    if noise_audio.size < speech_audio.size:
+        # Repeat noise to the same length as speech
+        n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
+        noise_audio_repeat = np.tile(noise_audio, n_repeat)
+        noise_audio = noise_audio_repeat[0 : len(speech_audio)]
+    else:
+        # Truncate noise to the same length as speech
+        noise_audio = noise_audio[onset: offset]
+    return noise_audio
     
     
 ###
