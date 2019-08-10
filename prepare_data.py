@@ -29,6 +29,31 @@ from MRCG_python import MRCG as MRCG
 # ! HACK: fix onset of noise to zero
 FIXED_NOISE_ONSET = True
 
+def get_audio_length(audio_path):
+    (audio, _) = read_audio(audio_path)
+    return len(audio)
+
+
+def get_rand_onset_offset(len_speech, len_noise, rs=np.random.RandomState()):
+    ''' Given a length of noise and a length of speech, 
+        select a random onset/offset of the noise equal to the speech length '''
+
+    if FIXED_NOISE_ONSET:
+        onset = 0
+        offset = len_speech
+
+    else:
+        # If noise shorter than speech then noise will be repeated in calculating features
+        if len_noise <= len_speech:
+            onset = 0
+            offset = len_speech
+        # If noise longer than speech then randomly select a segment of noise
+        else:
+            onset = rs.randint(0, len_noise - len_speech, size=1)[0]
+            offset = onset + len_speech
+
+    return onset, offset
+
 ###
 def create_mixture_csv(args):
     """Create csv containing mixture information. 
@@ -51,8 +76,9 @@ def create_mixture_csv(args):
     noise_dir = args.noise_dir
     data_type = args.data_type
     magnification = args.magnification
+    extra_speakers = args.extra_speakers
     
-    rs = np.random.RandomState(0)
+    rs = np.random.RandomState(0) # Use the same seed every time!
     
     # Paths
     out_csv_path = os.path.join(workspace, 'mixture_csvs', '{}.csv'.format(data_type))
@@ -63,8 +89,13 @@ def create_mixture_csv(args):
     
     # Names for CSV File
     fieldnames = ['speech_name', 'noise_name', 'noise_onset', 'noise_offset']
+    extra_speaker_fields = ['speech{}_name', 'speech{}_onset', 'speech{}_offset']
+    if extra_speakers:
+        for n in range(extra_speakers):
+            fieldnames += [field.format(n) for field in extra_speaker_fields]
 
     with open(out_csv_path, 'w') as f:
+        # Open CSV file writer. TODO use DictWriter
         writer = csv.writer(f, dialect='excel', delimiter='\t')
         writer.writerow(fieldnames) # Write header
 
@@ -85,29 +116,33 @@ def create_mixture_csv(args):
             else:
                 raise Exception('data_type must be train | test!')
 
+            # Pick extra speech names, ensuring we don't select our own
+            extra_speech_names = []
+            while len(extra_speech_names) < extra_speakers:
+                name = rs.choice(speech_names)
+                if name != speech_na:
+                    extra_speech_names.append(name)
+
             # Mix one speech with different noises many times
-            for noise_na in tqdm(selected_noise_names,disable=(len(selected_noise_names)<100)):
-                noise_path = os.path.join(noise_dir, noise_na)
-                (noise_audio, _) = read_audio(noise_path)
-                len_noise = len(noise_audio)
+            for noise_na in selected_noise_names:
 
-                if FIXED_NOISE_ONSET:
-                    noise_onset = 0
-                    nosie_offset = len_speech
+                # Choose onset and offset of noise
+                noise_len = get_audio_length(os.path.join(noise_dir, noise_na))
+                noise_onset, noise_offset = get_rand_onset_offset(len_speech, noise_len, rs)
 
-                else:
-                    # If noise shorter than speech then noise will be repeated in calculating features
-                    if len_noise <= len_speech:
-                        noise_onset = 0
-                        nosie_offset = len_speech
-                        
-                    # If noise longer than speech then randomly select a segment of noise
-                    else:
-                        noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
-                        nosie_offset = noise_onset + len_speech
-                # Write out to CSV finally
-                writer.writerow([speech_na, noise_na, noise_onset, nosie_offset])
+                # Choose onset and offset of each random speaker
+                extra_fields = []
+                for name in extra_speech_names:
+                    len_extra = get_audio_length(os.path.join(speech_dir, name))
+                    onset, offset = get_rand_onset_offset(len_speech, len_extra, rs)
+                    # Generate extra fields
+                    extra_fields += [name, onset, offset]
+
+                # Write out row to CSV
+                writer.writerow([speech_na, noise_na, noise_onset, noise_offset] +
+                                extra_fields)
     
+    # Finished, log name of CSV file
     logging.info('Write {} mixture csv to {}!'.format(data_type, out_csv_path))
     
     
@@ -410,6 +445,7 @@ if __name__ == '__main__':
     parser_create_mixture_csv.add_argument('--noise_dir', type=str, required=True)
     parser_create_mixture_csv.add_argument('--data_type', type=str, required=True)
     parser_create_mixture_csv.add_argument('--magnification', type=int, default=1)
+    parser_create_mixture_csv.add_argument('--extra_speakers', type=int, default=0)
 
     parser_calculate_mixture_features = subparsers.add_parser('calculate_mixture_features')
     parser_calculate_mixture_features.add_argument('--workspace', type=str, required=True)
@@ -417,6 +453,7 @@ if __name__ == '__main__':
     parser_calculate_mixture_features.add_argument('--noise_dir', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--data_type', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--snr', type=float, required=True)
+    parser_calculate_mixture_features.add_argument('--speaker_snr', type=float, default=-5)
     parser_calculate_mixture_features.add_argument('--mrcg', action='store_true', default=False)
     
     parser_pack_features = subparsers.add_parser('pack_features')

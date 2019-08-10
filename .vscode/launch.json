@@ -73,7 +73,7 @@
             "name": "mixture_csv",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/utils/prepare_data.py",
+            "program": "${workspaceRoot}/prepare_data.py",
             "cwd": "${workspaceRoot}",
             "args": [
                 "create_mixture_csv",
@@ -81,7 +81,8 @@
                 "--speech_dir=metadata/train_speech",
                 "--noise_dir=metadata/train_noise",
                 "--data_type=train",
-                "--magnification=2"
+                "--magnification=2",
+                "--extra_speakers=2"
             ],
             "redirectOutput": false,
             "console": "integratedTerminal"
