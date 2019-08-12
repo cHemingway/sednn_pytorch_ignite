@@ -3,7 +3,8 @@
     "files.watcherExclude": {
         "**/workspace/**" : true,
         "**/workspace_full/**": true,
-        "**/metadata/**" : true
+        "**/metadata/**" : true,
+        "**/wandb/**": true
     },
     "files.exclude": {
         "__pycache__": true,
