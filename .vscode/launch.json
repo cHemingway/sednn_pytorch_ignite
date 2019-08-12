@@ -15,7 +15,7 @@
             "name": "mixture_features",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/utils/prepare_data.py",
+            "program": "${workspaceRoot}/prepare_data.py",
             "args": [
                 "calculate_mixture_features",
                 "--workspace=workspace",
@@ -35,7 +35,7 @@
             "cwd": "${workspaceRoot}",
             "args": [
                 "pack_features",
-                "--workspace=workspace_full",
+                "--workspace=workspace",
                 "--data_type=test",
                 "--snr=0",
                 "--n_concat=7",
