@@ -72,7 +72,8 @@ class Data_Prepare_creator(object):
                     f"--noise_dir={self.data[data_type]['noise']} " 
                     f"--data_type={data_type} "
                     f"--snr={snr} "
-                    f"--extra_speech_db={self.config['extra_speech_db']}"
+                    f"--extra_speech_db={self.config['extra_speech_db']} "
+                    f"--mrcg "
                 )
             ],
             'clean': True,
@@ -81,7 +82,7 @@ class Data_Prepare_creator(object):
 
     def pack_features(self, data_type):
         feature_path = self.workspace / 'features' / 'spectrogram' / data_type
-        features = list(feature_path.rglob("*.p"))  # Search for all .p files
+        features = list(feature_path.rglob("*.npz"))  # Search for all .npz files
 
         return {
             'name': f'pack_features:{data_type}',

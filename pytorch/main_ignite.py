@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 from utils.utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 
     pad_with_border, log_sp, mat_2d_to_3d, inverse_scale, get_stft_window_func, 
-    write_audio, read_audio, calculate_spectrogram)
+    write_audio, read_audio, calculate_spectrogram, load_features)
 import models
 import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
@@ -224,20 +224,15 @@ def infer_test_audio(device, model, features_dir, audio_name, n_concat, scaler):
     overlap = config.overlap
     hop_size = window_size - overlap
 
-    # Load feature
+    # Load features
     feature_path = os.path.join(features_dir, audio_name)
-    data = pickle.load(open(feature_path, 'rb'))
-    # Hack, skip extra features if not given
-    if len(data) == 6:
-        [mixed_cmplx_x, speech_x, noise_x, alpha, extra_features, name] = data
-    else:
-        [mixed_cmplx_x, speech_x, noise_x, alpha, name] = data
-        extra_features = None
+    data = load_features(feature_path)
+    mixed_complx_x, speech_x, noise_x, alpha, mrcg = data
 
+    # Convert complex input x to real
+    mixed_x = np.abs(mixed_complx_x)
     
-    mixed_x = np.abs(mixed_cmplx_x)
-    
-    # Process data
+    # Pad and log data
     n_pad = (n_concat - 1) // 2
     mixed_x = pad_with_border(mixed_x, n_pad)
     mixed_x = log_sp(mixed_x)
@@ -264,7 +259,7 @@ def infer_test_audio(device, model, features_dir, audio_name, n_concat, scaler):
     
     # Recover enhanced wav
     prediction_sp = np.exp(prediction)
-    complex_sp = real_to_complex(prediction_sp, mixed_cmplx_x)
+    complex_sp = real_to_complex(prediction_sp, mixed_complx_x)
     frames = istft(complex_sp)
     
     # Overlap add

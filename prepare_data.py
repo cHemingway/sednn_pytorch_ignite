@@ -15,14 +15,10 @@ from typing import Tuple
 from tqdm import tqdm, trange
 import h5py
 import pickle
-try:
-    import cPickle
-except:
-    import _pickle as cPickle
 
 from utils.utilities import (create_folder, read_audio, write_audio, 
     calculate_spectrogram, log_sp, mat_2d_to_3d, pad_with_border, 
-    calculate_scaler)
+    calculate_scaler, save_features, load_features)
 import utils.config as config
 
 from MRCG_python import MRCG as MRCG
@@ -170,6 +166,9 @@ def calculate_mixture_features(args):
     snr = args.snr
     extra_speech_db = args.extra_speech_db # SNR of extra speakers
     sample_rate = config.sample_rate
+
+    if args.mrcg:
+        logging.info("Calculating MRCG as well")
     
     # Paths
     mixture_csv_path = os.path.join(workspace, 'mixture_csvs', '{}.csv'.format(data_type))
@@ -250,15 +249,15 @@ def calculate_mixture_features(args):
         # Extract extra
         if args.mrcg:
             mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
-            extra_features = {'mrcg':mrcg}
+        else:
+            mrcg = None
 
         # Write out features
         out_feature_path = os.path.join(workspace, 'features', 'spectrogram', 
-            data_type, '{}db'.format(int(snr)), '{}.p'.format(out_bare_name))
+            data_type, '{}db'.format(int(snr)), '{}.npz'.format(out_bare_name))
             
         create_folder(os.path.dirname(out_feature_path))
-        data = [mixed_complx_x, speech_x, noise_x, alpha, extra_features, out_bare_name]
-        cPickle.dump(data, open(out_feature_path, 'wb'))
+        save_features(out_feature_path,mixed_complx_x, speech_x, noise_x, alpha, mrcg)
         
 
     logging.debug('Extracting feature time: %s' % (time.time() - t1))
@@ -379,13 +378,8 @@ def pack_features(args):
         
         # Load feature. 
         feature_path = os.path.join(feature_dir, name)
-        data = cPickle.load(open(feature_path, 'rb'))
-        # Hack, skip extra features if not given
-        if len(data) == 6:
-            [mixed_complx_x, speech_x, noise_x, alpha, extra_features, name] = data
-        else:
-            [mixed_complx_x, speech_x, noise_x, alpha, name] = data
-            extra_features = None
+        data = load_features(feature_path)
+        mixed_complx_x, speech_x, noise_x, alpha, mrcg = data
 
         mixed_x = np.abs(mixed_complx_x)
 
@@ -406,8 +400,6 @@ def pack_features(args):
         y_all.append(y)
 
         # TODO MRCG needs to be fetched and cut here to consistent slices
-        if extra_features:    
-            mrcg = extra_features['mrcg']
         # Need to split into _components_, then slice
         # Might mean delta() needs to get changed as well?
         # Would have been easier if audio was sliced at the beginning tbh

@@ -119,3 +119,30 @@ def load_hdf5(hdf5_path):
 
 def np_mean_absolute_error(y_true, y_pred):
     return np.mean(np.abs(y_pred - y_true))
+
+
+def save_features(filename, mixed_complx_x, speech_x, noise_x, alpha, mrcg):
+    ''' Saves features for a file to a compressed npz file '''
+    # HACK should really take some kind of struct, instead of tons of params
+    kwargs = {
+        'mixed_complx_x': mixed_complx_x, 
+        'speech_x': speech_x, 
+        'noise_x': noise_x, 
+        'alpha': alpha, 
+    }
+    if mrcg is not None:
+        kwargs['mrcg'] = mrcg
+    
+    np.savez_compressed(filename, **kwargs)
+
+def load_features(filename):
+    ''' Loads features from a np or npz file '''
+    loaded = np.load(filename)
+    mrcg = loaded.get('mrcg')
+    return (
+            loaded['mixed_complx_x'], 
+            loaded['speech_x'],
+            loaded['noise_x'],
+            loaded['alpha'],
+            mrcg
+    )
