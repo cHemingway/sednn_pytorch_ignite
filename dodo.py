@@ -29,6 +29,8 @@ CONFIG = {
     "train_snr": get_var('train_snr', 0),
     "n_concat": get_var('n_concat', 7),
     "n_hop":     get_var('n_hop', 3),
+    "extra_speakers": get_var('extra_speakers',1),
+    "extra_speech_db": get_var('extra_speech_db',-5)
 }
 
 # Use different default workspace for full data
@@ -74,11 +76,9 @@ else:
 DATA["mixed"] =  CONFIG['workspace']/"mixed_audios"
 
 PACKED_FEATURE_DIR = CONFIG["workspace"] / 'packed_features' / 'spectrogram'
-PACKED_FEATURE_SUFFIX = pathlib.PurePath(
-    f'{CONFIG["train_snr"]}db') / "data.h5"
 PACKED_FEATURE_PATHS = [
-    PACKED_FEATURE_DIR / "test" / PACKED_FEATURE_SUFFIX,
-    PACKED_FEATURE_DIR / "train" / PACKED_FEATURE_SUFFIX
+    PACKED_FEATURE_DIR / "test" /  f'{CONFIG["test_snr"]}db' / "data.h5",
+    PACKED_FEATURE_DIR / "train" /  f'{CONFIG["train_snr"]}db' / "data.h5"
 ]
 
 SCALAR_PATH = CONFIG["workspace"] / "packed_features" / "spectrogram" / "train" \

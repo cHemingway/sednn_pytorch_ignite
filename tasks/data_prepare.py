@@ -29,7 +29,8 @@ class Data_Prepare_creator(object):
         ''' Yields a create_mixture_csv task of data_type '''
         yield {
             'name': f'create_mixture_csv:{data_type}',
-            'file_dep':  self.data_files + get_source_files("utils"),
+            'file_dep':  self.data_files + 
+                         get_source_files("utils") + ["prepare_data.py"],
             'task_dep': ['make_workspace'],
             # Using pathlib slash '/' operator
             'targets': [
@@ -44,7 +45,8 @@ class Data_Prepare_creator(object):
                     f"--speech_dir={self.data[data_type]['speech']} "
                     f"--noise_dir={self.data[data_type]['noise']} " 
                     f"--data_type={data_type} "
-                    f"--magnification={self.config['magnification']}"
+                    f"--magnification={self.config['magnification']} "
+                    f"--extra_speakers={self.config['extra_speakers']}"
                 )
             ],
             'uptodate': [config_changed(self.config)],
@@ -69,7 +71,8 @@ class Data_Prepare_creator(object):
                     f"--speech_dir={self.data[data_type]['speech']} "
                     f"--noise_dir={self.data[data_type]['noise']} " 
                     f"--data_type={data_type} "
-                    f"--snr={snr}"
+                    f"--snr={snr} "
+                    f"--extra_speech_db={self.config['extra_speech_db']}"
                 )
             ],
             'clean': True,
