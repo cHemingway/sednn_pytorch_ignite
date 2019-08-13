@@ -11,6 +11,7 @@ import csv
 import time
 import logging
 from typing import Tuple
+import functools
 
 from tqdm import tqdm, trange
 import h5py
@@ -22,6 +23,8 @@ from utils.utilities import (create_folder, read_audio, write_audio,
 import utils.config as config
 
 from MRCG_python import MRCG as MRCG
+
+import multiprocessing
 
 # ! HACK: fix onset of noise to zero
 FIXED_NOISE_ONSET = True
@@ -143,8 +146,85 @@ def create_mixture_csv(args):
     
     # Finished, log name of CSV file
     logging.info('Write {} mixture csv to {}!'.format(data_type, out_csv_path))
+
+
+def calculate_features(args, row):
+    workspace = args.workspace
+    speech_dir = args.speech_dir
+    noise_dir = args.noise_dir
+    data_type = args.data_type
+    snr = args.snr
+    extra_speech_db = args.extra_speech_db # SNR of extra speakers
+    sample_rate = config.sample_rate
+
+    noise_onset = int(row['noise_onset'])
+    noise_offset = int(row['noise_offset'])
+
+    def read_speech(name):
+        speech_path = os.path.join(speech_dir, name)
+        (speech_audio, _) = read_audio(speech_path, target_fs=sample_rate)
+        return speech_audio
     
+    # Read speech audio
+    speech_audio = read_speech(row['speech_name'])
     
+    # Read noise audio
+    noise_path = os.path.join(noise_dir, row['noise_name'])
+    (noise_audio, _) = read_audio(noise_path, target_fs=sample_rate)
+    
+    # Trim/repeat noise
+    noise_audio = adjust_noise_length(noise_audio, noise_onset, noise_offset, speech_audio)
+
+    # Scale speech to given snr
+    scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
+    speech_audio *= scaler
+
+    # Read extra speech audio
+    extra_speech_total = np.zeros_like(speech_audio)
+    for name,onset,offset in get_extras(row):
+          extra_speech = read_speech(name)
+          extra_speech = adjust_noise_length(extra_speech, onset, offset, speech_audio)
+          scaler = get_amplitude_scaling_factor(extra_speech, speech_audio, snr=extra_speech_db)
+          extra_speech *= scaler # Scale the extra speech instead
+          extra_speech_total += extra_speech
+    
+    # Add to noise_audio
+    noise_audio += extra_speech_total
+        
+    # Get normalized mixture, speech, noise
+    (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
+
+    # Write out mixed audio
+    out_bare_name = os.path.join('{}.{}'.format(
+        os.path.splitext(row['speech_name'])[0], os.path.splitext(row['noise_name'])[0]))
+        
+    out_audio_path = os.path.join(workspace, 'mixed_audios', 
+        data_type, '{}db'.format(int(snr)), '{}.wav'.format(out_bare_name))
+        
+    create_folder(os.path.dirname(out_audio_path))
+    write_audio(out_audio_path, mixed_audio, sample_rate)
+    if logging.DEBUG >= logging.root.level:
+        tqdm.write('Write mixture wav to: {}'.format(out_audio_path))
+
+    # Extract spectrogram
+    mixed_complx_x = calculate_spectrogram(mixed_audio, mode='complex')
+    speech_x = calculate_spectrogram(speech_audio, mode='magnitude')
+    noise_x = calculate_spectrogram(noise_audio, mode='magnitude')
+    
+    # Extract MRCG on request
+    if args.mrcg:
+        mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
+    else:
+        mrcg = None
+
+    # Write out features
+    out_feature_path = os.path.join(workspace, 'features', 'spectrogram', 
+        data_type, '{}db'.format(int(snr)), '{}.npz'.format(out_bare_name))
+        
+    create_folder(os.path.dirname(out_feature_path))
+    save_features(out_feature_path,mixed_complx_x, speech_x, noise_x, alpha, mrcg)
+    
+
 ###
 def calculate_mixture_features(args):
     """Calculate spectrogram for mixed, speech and noise audio. Then write the 
@@ -160,107 +240,39 @@ def calculate_mixture_features(args):
     
     # Arguments & parameters
     workspace = args.workspace
-    speech_dir = args.speech_dir
-    noise_dir = args.noise_dir
     data_type = args.data_type
-    snr = args.snr
-    extra_speech_db = args.extra_speech_db # SNR of extra speakers
-    sample_rate = config.sample_rate
+    # Further args get passed to calculate_features function
 
     if args.mrcg:
         logging.info("Calculating MRCG as well")
     
     # Paths
     mixture_csv_path = os.path.join(workspace, 'mixture_csvs', '{}.csv'.format(data_type))
-
-    def read_speech(name):
-        speech_path = os.path.join(speech_dir, name)
-        (speech_audio, _) = read_audio(speech_path, target_fs=sample_rate)
-        return speech_audio
     
     # Open mixture csv and convert to list of rows
     with open(mixture_csv_path, 'r') as f:
-        # has_header = csv.excel().has_header(f.read(1024)) # Check for header
-        #f.seek(0)
         reader = csv.DictReader(f, dialect='excel')
-        #if has_header:      # Skip header
-        #    next(reader)
-        lis = list(reader)
+        rows = list(reader)
 
-    t1 = time.time()
-    
-    # Go through each speech/noise row, using TQDM trange() for progress bar
-    pbar = tqdm(lis, desc="Calculating {} features".format(data_type))
-    for row in pbar:
-        
-        noise_onset = int(row['noise_onset'])
-        noise_offset = int(row['noise_offset'])
-        
-        # Read speech audio
-        speech_audio = read_speech(row['speech_name'])
-        
-        # Read noise audio
-        noise_path = os.path.join(noise_dir, row['noise_name'])
-        (noise_audio, _) = read_audio(noise_path, target_fs=sample_rate)
-        
-        # Trim/repeat noise
-        noise_audio = adjust_noise_length(noise_audio, noise_onset, noise_offset, speech_audio)
+    # Create progress bar
+    pbar = tqdm(desc="Calculating {} features".format(data_type), total=len(rows))
 
-        # Scale speech to given snr
-        scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
-        speech_audio *= scaler
+    # Use multiprocessing to call calculate_features on each row of CSV
+    # We use imap to get a progress bar here, see https://github.com/tqdm/tqdm/issues/484#issuecomment-351001534
+    pool = multiprocessing.Pool()
 
-        # Read extra speech audio
-        extra_speech_total = np.zeros_like(speech_audio)
-        for name,onset,offset in get_extras(row):
-              extra_speech = read_speech(name)
-              extra_speech = adjust_noise_length(extra_speech, onset, offset, speech_audio)
-              scaler = get_amplitude_scaling_factor(extra_speech, speech_audio, snr=extra_speech_db)
-              extra_speech *= scaler # Scale the extra speech instead
-              extra_speech_total += extra_speech
-        
-        # Add to noise_audio
-        noise_audio += extra_speech_total
-            
-        # Get normalized mixture, speech, noise
-        (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
+    # Create partial function of calculate_features so only rows var is changed
+    apply_row = functools.partial(calculate_features, 
+                                  args
+                                  #rows is passed here
+                                  )
 
-        # Write out mixed audio
-        out_bare_name = os.path.join('{}.{}'.format(
-            os.path.splitext(row['speech_name'])[0], os.path.splitext(row['noise_name'])[0]))
-            
-        out_audio_path = os.path.join(workspace, 'mixed_audios', 
-            data_type, '{}db'.format(int(snr)), '{}.wav'.format(out_bare_name))
-            
-        create_folder(os.path.dirname(out_audio_path))
-        write_audio(out_audio_path, mixed_audio, sample_rate)
-        if logging.DEBUG >= logging.root.level:
-            tqdm.write('Write mixture wav to: {}'.format(out_audio_path))
+    for _ in pool.imap_unordered(apply_row, rows):
+        pbar.update() # Update progress bar
 
-        # Extract spectrogram
-        mixed_complx_x = calculate_spectrogram(mixed_audio, mode='complex')
-        speech_x = calculate_spectrogram(speech_audio, mode='magnitude')
-        noise_x = calculate_spectrogram(noise_audio, mode='magnitude')
-
-        # Save 'extra' features in dict
-        # As original code only uses spectogram
-        extra_features = dict()
-        
-        # Extract extra
-        if args.mrcg:
-            mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
-        else:
-            mrcg = None
-
-        # Write out features
-        out_feature_path = os.path.join(workspace, 'features', 'spectrogram', 
-            data_type, '{}db'.format(int(snr)), '{}.npz'.format(out_bare_name))
-            
-        create_folder(os.path.dirname(out_feature_path))
-        save_features(out_feature_path,mixed_complx_x, speech_x, noise_x, alpha, mrcg)
-        
-
-    logging.debug('Extracting feature time: %s' % (time.time() - t1))
+    pool.close()
+    pool.join() # Block until all finished
+    pbar.close() # Close progress bar
     
 
 def get_extras(row: dict) -> Tuple[str, int, int]:
@@ -457,6 +469,10 @@ def write_out_scaler(args):
     
 ###
 if __name__ == '__main__':
+
+    # Needed for PTVSD Debugging of multiprocessing
+    multiprocessing.set_start_method('spawn', True)
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
