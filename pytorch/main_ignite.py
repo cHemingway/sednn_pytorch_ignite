@@ -177,6 +177,7 @@ def train(args):
     def log_test_results(trainer):
         ''' Show test results every epoch '''
         state = evaluator.run(test_loader)
+        #pylint: disable=no-member
         metrics = state.metrics
         loss = metrics['loss']
         # Show in progress bar
