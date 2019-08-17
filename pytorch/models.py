@@ -10,11 +10,12 @@ import torch.nn.functional as F
 
     
 class DNN(nn.Module):
-    def __init__(self, n_concat, freq_bins):
+    def __init__(self, n_concat, freq_bins, dropout=0.2):
         
         super().__init__()
         
         hidden_units = 2048
+        self.dropout = dropout
         
         self.fc1 = nn.Linear(n_concat * freq_bins, hidden_units)
         self.fc2 = nn.Linear(hidden_units, hidden_units)
@@ -65,11 +66,11 @@ class DNN(nn.Module):
         x = input.view(batch_size, n_concat * freq_bins)
         
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.relu(self.fc2(x))
-        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.relu(self.fc3(x))
-        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.fc4(x)
         
         return x
@@ -77,10 +78,12 @@ class DNN(nn.Module):
 
 class LSTM(nn.Module):
     ''' LSTM based on 'A new feature set for masking-based monaural speech seperation '''
-    def __init__(self, n_concat, freq_bins):
+    def __init__(self, n_concat, freq_bins, dropout=0.2):
         
         super().__init__()
         
+        self.dropout = dropout
+
         # TODO these should be passed in from main
         hidden_units = 1024
         self.lstm_size = 512
@@ -133,12 +136,12 @@ class LSTM(nn.Module):
             x = self.fc1(x)
             # Fully connected hidden layer
             x = F.relu(self.fc2(x))
-            x = F.dropout(x, p=0.2, training=self.training)
+            x = F.dropout(x, p=self.dropout, training=self.training)
             # 2 LSTM Layers
             h0, c0 = self.lstm1(x, (h0, c0))
-            x = F.dropout(h0, p=0.2, training=self.training)
+            x = F.dropout(h0, p=self.dropout, training=self.training)
             h1, c1 = self.lstm2(x, (h1, c1))
-            x = F.dropout(h1, p=0.2, training=self.training)
+            x = F.dropout(h1, p=self.dropout, training=self.training)
             # Output layer, linear activation (i.e none)
             x = self.fc3(x)
 

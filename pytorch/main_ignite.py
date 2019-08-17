@@ -66,6 +66,7 @@ def train(args):
     te_snr = args.te_snr
     batch_size = args.batch_size
     lr = args.lr
+    dropout = args.dropout
     device = 'cpu'
     validate_every = 100
 
@@ -116,7 +117,7 @@ def train(args):
 
     # Load Model and pass in properties of dataset
     print(f"Using Model {args.model_name}")
-    model = args.model(**data_prop)
+    model = args.model(**data_prop, dropout=dropout)
 
     if torch.cuda.device_count() > 1:
         print(colored('Using {} GPUs'.format(torch.cuda.device_count()),'green'))
@@ -404,7 +405,9 @@ if __name__ == '__main__':
     parser_train.add_argument('--loss_func', dest="loss_name", 
                               choices=loss_functions, default='MSE')
     parser_train.add_argument('--validation_split', type=float, default=0.1,
-                              choices=[Range(0.0, 0.2)])                              
+                              choices=[Range(0.0, 0.2)])
+    parser_train.add_argument('--dropout', type=float, default=0.2,
+                              choices=[Range(0.0, 0.5)])
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
