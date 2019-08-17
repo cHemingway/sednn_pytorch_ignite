@@ -201,7 +201,7 @@ def train(args):
             tb_logger.writer.add_scalar('training/val_loss', metrics['loss'], 
                                         global_step=trainer.state.iteration)
             # Log to w&b
-            wandb.log({"Validation Loss": metrics['loss']})
+            wandb.log({"Validation Loss": metrics['loss']}, step=trainer.state.iteration)
 
     
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -215,7 +215,7 @@ def train(args):
         pbar.log_message("Test Set Results - Epoch: {}  Avg loss: {:.2f}"
             .format(trainer.state.epoch, loss))
         # Show in train set
-        wandb.log({"Test Loss": loss})
+        wandb.log({"Test Loss": loss}, step=trainer.state.iteration)
 
     # Handler to save checkpoints
     chkpoint_handler = ModelCheckpoint(models_dir, 
