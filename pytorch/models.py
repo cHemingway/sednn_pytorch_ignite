@@ -89,6 +89,8 @@ class LSTM(nn.Module):
         # From the paper, "The model consists of
         # One fully connected layer of size 1024
         self.fc1 = nn.Linear(freq_bins, hidden_units)
+        # One hidden layer
+        self.fc2 = nn.Linear(hidden_units, hidden_units)
         # Two LSTM layers of 512 units 
         self.lstm1 = nn.LSTMCell(hidden_units, self.lstm_size)
         self.lstm2 = nn.LSTMCell(self.lstm_size, self.lstm_size)
@@ -127,8 +129,10 @@ class LSTM(nn.Module):
                 pad_size = self.lstm_timestep - x.size(0)
                 x = torch.nn.functional.pad(x, (0,0,0,pad_size))
 
-            # Fully connected layer
-            x = F.relu(self.fc1(x))
+            # Input layer
+            x = self.fc1(x)
+            # Fully connected hidden layer
+            x = F.relu(self.fc2(x))
             x = F.dropout(x, p=0.2, training=self.training)
             # 2 LSTM Layers
             h0, c0 = self.lstm1(x, (h0, c0))
