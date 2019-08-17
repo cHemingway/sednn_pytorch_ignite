@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 from utils.utilities import (create_folder, load_hdf5, scale, np_mean_absolute_error, 
     pad_with_border, log_sp, mat_2d_to_3d, inverse_scale, get_stft_window_func, 
-    write_audio, read_audio, calculate_spectrogram, load_features)
+    write_audio, read_audio, calculate_spectrogram, load_features, Range)
 import models
 import utils.config as config
 from utils.stft import real_to_complex, istft, get_cola_constant, overlap_add
@@ -67,6 +67,7 @@ def train(args):
     batch_size = args.batch_size
     lr = args.lr
     device = 'cpu'
+    validate_every = 100
 
     # Initialise W&B, ensuring we remove the tricky "model" attribute from args
     safe_config = vars(args).copy() # Convert to dictionary and get a copy
@@ -100,9 +101,21 @@ def train(args):
     train_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
     test_dataset = NoisySpeechFeaturesDataset(train_hdf5_path, scaler_path)
 
+    # Get properties embedded in dataset, e.g. n_concat        
+    data_prop = train_dataset.get_properties()
+
+    # Split train_dataset into train and validation set
+    train_len = len(train_dataset)
+    validation_len = int(args.validation_split * train_len)
+    train_len = train_len - validation_len
+    train_dataset, validation_dataset = torch.utils.data.random_split(
+                                                        train_dataset, 
+                                                        (train_len, validation_len))
+    print("Split dataset, {} train {} validation".format(train_len, validation_len))
+
+
     # Load Model and pass in properties of dataset
     print(f"Using Model {args.model_name}")
-    data_prop = train_dataset.get_properties()
     model = args.model(**data_prop)
 
     if torch.cuda.device_count() > 1:
@@ -117,6 +130,10 @@ def train(args):
                                             batch_size=batch_size, 
                                             shuffle=True, 
                                             pin_memory=True)
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, 
+                                            batch_size=batch_size, 
+                                            shuffle=True, 
+                                            pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset,
                                             batch_size=batch_size, 
                                             shuffle=True, 
@@ -128,7 +145,7 @@ def train(args):
     # Loss function, specified by args
     loss = args.loss
 
-    # Setup trainer and evalduator
+    # Setup trainer and evaluator
     trainer = create_supervised_trainer(model, optimizer, loss, device=device)
     evaluator = create_supervised_evaluator(model,
                                             device=device,
@@ -155,9 +172,9 @@ def train(args):
 
     # Plot spectrogram before/after cleaning
     # TODO plot after!
-    n_concat = train_dataset.get_properties()['n_concat']
-    fig = plot_spectrogram(train_dataset.x,train_dataset.y,n_concat)
-    tb_logger.writer.add_figure('Spectrogram',fig,global_step=0,close=True)
+    # n_concat = data_prop['n_concat']
+    # fig = plot_spectrogram(train_dataset.x,train_dataset.y,n_concat)
+    # tb_logger.writer.add_figure('Spectrogram',fig,global_step=0,close=True)
 
     # Attach tensorboard loggers
     tb_logger.attach(trainer,
@@ -173,6 +190,19 @@ def train(args):
                 event_name=Events.EPOCH_COMPLETED)
 
 
+    @trainer.on(Events.ITERATION_COMPLETED)
+    def validate(trainer):
+        ''' Show validation_loss results every validate_every '''
+        if trainer.state.iteration % validate_every == 0:
+            evaluator.run(validation_loader)
+            metrics = evaluator.state.metrics
+            # Log to tensorboard
+            tb_logger.writer.add_scalar('training/val_loss', metrics['loss'], 
+                                        global_step=trainer.state.iteration)
+            # Log to w&b
+            wandb.log({"Validation Loss": metrics['loss']})
+
+    
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_test_results(trainer):
         ''' Show test results every epoch '''
@@ -373,6 +403,8 @@ if __name__ == '__main__':
     parser_train.add_argument('--max_epochs', type=int, default=10)
     parser_train.add_argument('--loss_func', dest="loss_name", 
                               choices=loss_functions, default='MSE')
+    parser_train.add_argument('--validation_split', type=float, default=0.1,
+                              choices=[Range(0.0, 0.2)])                              
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)

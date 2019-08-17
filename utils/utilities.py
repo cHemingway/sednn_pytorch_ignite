@@ -146,3 +146,12 @@ def load_features(filename):
             loaded['alpha'],
             mrcg
     )
+
+class Range(object):
+    ''' Validation class for argpase.
+        From https://stackoverflow.com/a/12117089 '''
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+    def __eq__(self, other):
+        return self.start <= other <= self.end
