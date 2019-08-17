@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os, sys
 # Add parent of parent folder to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -201,7 +203,7 @@ def train(args):
             tb_logger.writer.add_scalar('training/val_loss', metrics['loss'], 
                                         global_step=trainer.state.iteration)
             # Log to w&b
-            wandb.log({"Validation Loss": metrics['loss']}, step=trainer.state.iteration)
+            wandb.log({"val_loss": metrics['loss']}, step=trainer.state.iteration)
 
     
     @trainer.on(Events.EPOCH_COMPLETED)

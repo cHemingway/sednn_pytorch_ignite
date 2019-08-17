@@ -1,0 +1,22 @@
+# Weights and Biases Sweep setup, see https://docs.wandb.com/docs/sweep.html
+description: Basic learning rate sweep for LSTM
+
+# Training script to run
+program: scripts/wrap_train_lstm.py
+
+# Use random search
+method: random
+
+# Metric to optimize
+metric:
+  name: val_loss
+  goal: minimize
+
+# Parameters to search over
+parameters:
+  lr:
+    min: 0.00001
+    max: 0.01
+  dropout:
+    min: 0.01
+    max: 0.5
