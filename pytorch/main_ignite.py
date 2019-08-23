@@ -77,7 +77,7 @@ def train(args):
     safe_config.pop('model') # Remove model attribute
     safe_config.pop('mode') # Remove needless mode attribute, will always be train
     safe_config.pop('loss') # Remove loss attribute
-    wandb.init(project="mss_speech_sep_lstm",config=safe_config)
+    wandb.init(project="mss_speech_sep_lstm",config=safe_config,sync_tensorboard=True)
 
     if torch.cuda.is_available():
         device = 'cuda'
