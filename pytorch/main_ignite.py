@@ -81,6 +81,15 @@ def plot_spectrogram(x,y,n_concat):
     plt.tight_layout()
     return fig
 
+def split_train_val_sequential(dataset: torch.utils.data.Dataset, ratio):
+    train_len = len(dataset)
+    validation_len = int(ratio * train_len)
+    train_len = train_len - validation_len
+    val_idx = list(range(train_len,len(dataset)))
+    train_dataset = torch.utils.data.Subset(dataset, list(range(train_len)))
+    val_dataset = torch.utils.data.Subset(dataset, val_idx)
+    print("Split dataset, {} train {} validation".format(train_len, validation_len))
+    return train_dataset, val_dataset
 
 def train(args, model_vars):
 
@@ -90,15 +99,21 @@ def train(args, model_vars):
     te_snr = args.te_snr
     batch_size = args.batch_size
     lr = args.lr
-    dropout = args.dropout
     device = 'cpu'
     validate_every = 100
+    # We already "shuffled" when choosing audio files.
+    # Shuffling again would break any kind of RNN from working, as this would
+    # randomly rearrange each spectrogram.
+    shuffle_data = False 
+    # Disable parallel GPU usage as breaks sequential_sampler
+    use_parallel = False
 
     # Initialise W&B, ensuring we remove the tricky "model" attribute from args
     safe_config = vars(args).copy() # Convert to dictionary and get a copy
     safe_config.pop('model') # Remove model attribute
     safe_config.pop('mode') # Remove needless mode attribute, will always be train
     safe_config.pop('loss') # Remove loss attribute
+    safe_config['shuffle_data'] = shuffle_data
     safe_config.update(model_vars) # Add model hyperparams
     wandb.init(project="mss_speech_sep_lstm",config=safe_config,sync_tensorboard=True)
 
@@ -131,20 +146,16 @@ def train(args, model_vars):
     data_prop = train_dataset.get_properties()
 
     # Split train_dataset into train and validation set
-    train_len = len(train_dataset)
-    validation_len = int(args.validation_split * train_len)
-    train_len = train_len - validation_len
-    train_dataset, validation_dataset = torch.utils.data.random_split(
-                                                        train_dataset, 
-                                                        (train_len, validation_len))
-    print("Split dataset, {} train {} validation".format(train_len, validation_len))
+    train_dataset, validation_dataset = split_train_val_sequential(
+                                            train_dataset, 
+                                            args.validation_split)
 
 
     # Load Model and pass in properties of dataset
     print(f"Using Model {args.model_name}")
     model = args.model(**data_prop, **model_vars)
 
-    if torch.cuda.device_count() > 1:
+    if use_parallel==True and torch.cuda.device_count() > 1:
         print(colored('Using {} GPUs'.format(torch.cuda.device_count()),'green'))
         model = torch.nn.DataParallel(model).to(device)
     
@@ -152,17 +163,26 @@ def train(args, model_vars):
     # TODO: setting num_workers > 1 breaks CUDA? Needs restart to fix!
     # See https://github.com/pytorch/pytorch/issues/2517
     print("Dataloader...")
+
+    if shuffle_data:
+        sampler = None
+    else:
+        sampler = torch.utils.data.SequentialSampler
+
     train_loader = torch.utils.data.DataLoader(train_dataset, 
                                             batch_size=batch_size, 
-                                            shuffle=True, 
+                                            shuffle=shuffle_data,
+                                            sampler=sampler(train_dataset),
                                             pin_memory=True)
     validation_loader = torch.utils.data.DataLoader(validation_dataset, 
                                             batch_size=batch_size, 
-                                            shuffle=True, 
+                                            shuffle=shuffle_data,
+                                            sampler=sampler(validation_dataset),
                                             pin_memory=True)
     test_loader = torch.utils.data.DataLoader(test_dataset,
                                             batch_size=batch_size, 
-                                            shuffle=True, 
+                                            shuffle=shuffle_data,
+                                            sampler=sampler(test_dataset),
                                             pin_memory=True)
 
     # Optimizer
@@ -369,7 +389,7 @@ def inference(args, model_vars):
     enh_audios_dir = args.enhanced_dir
 
     # Load model
-    model = args.model(n_concat, freq_bins)   
+    model = args.model(n_concat, freq_bins, **model_vars)   
     state_dict = torch.load(model_path) 
 
     # Hack to remove results of DataParallel
