@@ -152,3 +152,65 @@ class LSTM(nn.Module):
         # Remove the padding from the end
         output = output[:batch_size,:]
         return output # Return concatanated version
+
+
+class GRU(nn.Module):
+    ''' GRU model, supports variable length '''
+    def __init__(self, n_concat, freq_bins, dropout=0.2, 
+                  *, timestep=64, rnn_layers=2, rnn_params=2):
+    
+        super().__init__()
+        
+        self.dropout = dropout
+        self.timestep = timestep
+        self.rnn_size = 512
+        self.rnn_layers = rnn_layers
+        self.hidden_units = 1024 # TODO make parameter
+
+        # From the paper, "The model consists of
+        # One fully connected layer of size 1024
+        self.fc1 = nn.Linear(freq_bins, self.hidden_units)
+        # One hidden layer
+        self.fc2 = nn.Linear(self.hidden_units, self.hidden_units)
+        # N GRU Layers
+        self.gru1 = nn.GRU(input_size=self.hidden_units, 
+                           hidden_size=self.rnn_size, 
+                           num_layers=self.rnn_layers)
+        # Output layer
+        self.fc3 = nn.Linear(self.rnn_size, freq_bins)
+
+                
+    def forward(self, input):
+        (batch_size, n_concat, freq_bins) = input.shape
+
+        # Select only middle bin, effectively ignoring n_concat
+        # We do this by "cutting out" the n_concat axis
+        midpoint = (n_concat // 2) + 1
+        x = input.select(1,midpoint)
+
+        # Run fully connected nets
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = F.relu(self.fc2(x))
+        x = F.dropout(x, p=self.dropout, training=self.training)
+
+        # Reshape into sequence, batch, freq_bins format
+        x = torch.split(x, self.timestep)
+        x = nn.utils.rnn.pad_sequence(x)
+
+        gru_batch_size = x.shape[1] # Need batch size for hidden state
+
+        # Run GRU with initial random state
+        # Don't keep state around for next timestep
+        h0 = torch.randn(self.rnn_layers, gru_batch_size, self.rnn_size, 
+                         device=x.device)
+        x, h0 = self.gru1(x, h0)
+        
+        # Unpack and concatanate back, trimming off padding
+        x = torch.reshape(x, (-1,self.rnn_size))
+        x = x[:batch_size,:]
+        
+        # Run fully connected net for output
+        x = self.fc3(x)
+
+        return x
