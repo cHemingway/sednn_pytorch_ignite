@@ -1,6 +1,17 @@
 ''' Models for main_ignite.py. 
 Every model takes n_concat, freq_bins as init arguments
-New models are detected automatically '''
+New models are detected automatically
+
+Add hyperparameters (numerical only) as keyword only arguments, and they will
+be added to the command line parser, e.g
+    class MyModel(nn.Module)
+        __init__(self, n_concat, freq_bins, * , num_layers=4):
+            pass
+    
+    Ends up with this call signature on the command line:
+        main_ignite.py MyModel train --num_layers=4
+
+ '''
 
 import math
 
@@ -10,7 +21,7 @@ import torch.nn.functional as F
 
     
 class DNN(nn.Module):
-    def __init__(self, n_concat, freq_bins, dropout=0.2):
+    def __init__(self, n_concat, freq_bins, *, dropout=0.2):
         
         super().__init__()
         
@@ -78,7 +89,7 @@ class DNN(nn.Module):
 
 class LSTM(nn.Module):
     ''' LSTM based on 'A new feature set for masking-based monaural speech seperation '''
-    def __init__(self, n_concat, freq_bins, dropout=0.2):
+    def __init__(self, n_concat, freq_bins, *, dropout=0.2):
         
         super().__init__()
         
@@ -156,16 +167,16 @@ class LSTM(nn.Module):
 
 class GRU(nn.Module):
     ''' GRU model, supports variable length '''
-    def __init__(self, n_concat, freq_bins, dropout=0.2, 
-                  *, timestep=64, rnn_layers=2, rnn_params=2):
+    def __init__(self, n_concat, freq_bins, 
+                  *, dropout=0.2, hidden_units=1024, timestep=64, rnn_layers=2, rnn_size=512):
     
         super().__init__()
         
         self.dropout = dropout
         self.timestep = timestep
-        self.rnn_size = 512
+        self.rnn_size = rnn_size
         self.rnn_layers = rnn_layers
-        self.hidden_units = 1024 # TODO make parameter
+        self.hidden_units = hidden_units
 
         # From the paper, "The model consists of
         # One fully connected layer of size 1024

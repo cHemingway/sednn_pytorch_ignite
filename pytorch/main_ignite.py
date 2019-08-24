@@ -49,6 +49,28 @@ def get_models():
     models_list =  inspect.getmembers(models,predicate=is_module)
     return dict(models_list)
 
+
+def get_model_kwargs(model_class: torch.nn.Module):
+    ''' Get keyword arguments of model, handles float or int based on default
+        Returns dict(keyword, default)
+    '''
+    kwargs = dict()
+    sig = inspect.signature(model_class)
+    for name,p in sig.parameters.items():
+        if p.kind == inspect.Parameter.KEYWORD_ONLY:
+            assert(p.default is not inspect.Parameter.empty)
+            kwargs[name] = p.default
+    return kwargs
+
+
+def model_kwargs_to_argparser(kwargs):
+    ''' Create argument parser from output of get_model_kwargs '''
+    parser = argparse.ArgumentParser()
+    for name,default in kwargs.items():
+        parser.add_argument(f'--{name}',type=type(default), default=default)
+    return parser
+
+
 def plot_spectrogram(x,y,n_concat):
     ''' Given Tensors x,y, returns a figure of the first 1000 items '''
     fig, axs = plt.subplots(2,1, sharex=True)
@@ -60,7 +82,7 @@ def plot_spectrogram(x,y,n_concat):
     return fig
 
 
-def train(args):
+def train(args, model_vars):
 
     # Arugments & parameters
     workspace = args.workspace
@@ -77,6 +99,7 @@ def train(args):
     safe_config.pop('model') # Remove model attribute
     safe_config.pop('mode') # Remove needless mode attribute, will always be train
     safe_config.pop('loss') # Remove loss attribute
+    safe_config.update(model_vars) # Add model hyperparams
     wandb.init(project="mss_speech_sep_lstm",config=safe_config,sync_tensorboard=True)
 
     if torch.cuda.is_available():
@@ -119,7 +142,7 @@ def train(args):
 
     # Load Model and pass in properties of dataset
     print(f"Using Model {args.model_name}")
-    model = args.model(**data_prop, dropout=dropout)
+    model = args.model(**data_prop, **model_vars)
 
     if torch.cuda.device_count() > 1:
         print(colored('Using {} GPUs'.format(torch.cuda.device_count()),'green'))
@@ -303,7 +326,7 @@ def infer_test_audio(device, model, features_dir, audio_name, n_concat, scaler):
     return enh_audio
 
 
-def inference(args):
+def inference(args, model_vars):
     """Inference all test data, write out recovered wavs to disk. 
     
     Args:
@@ -390,7 +413,9 @@ if __name__ == '__main__':
         'MSE': F.mse_loss
     }
 
-    parser = argparse.ArgumentParser(description='')
+    parser = argparse.ArgumentParser(description='Run training/inference',
+                                    # Can't use abbrev for parse_known_args()
+                                     allow_abbrev=False)
 
     parser.add_argument("model_name", help="Model from models.py to use",
                         choices=models.keys())
@@ -408,8 +433,6 @@ if __name__ == '__main__':
                               choices=loss_functions, default='MSE')
     parser_train.add_argument('--validation_split', type=float, default=0.1,
                               choices=[Range(0.0, 0.2)])
-    parser_train.add_argument('--dropout', type=float, default=0.2,
-                              choices=[Range(0.0, 0.5)])
 
     parser_inference = subparsers.add_parser('inference')
     parser_inference.add_argument('--workspace', type=str, required=True)
@@ -418,16 +441,20 @@ if __name__ == '__main__':
     parser_inference.add_argument('--te_snr', type=float, required=True)
     parser_inference.add_argument('--n_concat', type=int, required=True)
 
-    args = parser.parse_args()
+    args, remaining_args = parser.parse_known_args()
 
     # Add model to arguments
     args.model = models[args.model_name]
-    
+
+    # Add extra model arguments if given
+    extra_kwargs = get_model_kwargs(args.model)
+    extra_parser = model_kwargs_to_argparser(extra_kwargs)
+    model_vars = vars(extra_parser.parse_args(remaining_args))
 
     if args.mode == 'train':
         args.loss = loss_functions[args.loss_name]
-        train(args)
+        train(args, model_vars)
     elif args.mode == 'inference':
-        inference(args)
+        inference(args, model_vars)
     else:
         raise Exception('Error argument!')
