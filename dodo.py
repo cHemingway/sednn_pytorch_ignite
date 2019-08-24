@@ -25,8 +25,8 @@ from tasks.utils import get_data_filenames, get_source_files, delete_dir,\
 CONFIG = {
     "fulldata": get_var('fulldata', None),
     "magnification": get_var('magnification', 2),
-    "test_snr": get_var('te_snr', 0),
-    "train_snr": get_var('train_snr', 0),
+    "test_snr": get_var('te_snr', 5),
+    "train_snr": get_var('train_snr', 5),
     "n_concat": get_var('n_concat', 7),
     "n_hop":     get_var('n_hop', 3),
     "extra_speakers": get_var('extra_speakers',1),
@@ -137,6 +137,22 @@ def task_mask_lstm():
     yield task_gen.tasks()
 
 
+GRU_ENHANCED_DIR = CONFIG['workspace'] /"enh_wavs" / "GRU"
+@create_after(executed='prepare_data', target_regex='*.*')
+def task_mask_gru():
+    ''' Gated Recurrent Unit Model '''
+    task_gen = MASK_DNN_basic_creator(DATA, CONFIG['workspace'],
+                                        "GRU",
+                                        GRU_ENHANCED_DIR,
+                                        RESULT_DIR,
+                                        SCALAR_PATH, PACKED_FEATURE_PATHS,
+                                        CONFIG['fulldata'],
+                                        CONFIG['train_snr'], CONFIG['test_snr'],
+                                        CONFIG['n_concat'])
+    yield task_gen.tasks()
+
+
+
 SEGAN_ENHANCED_DIR = CONFIG['workspace'] / "enh_wavs"/"synth_segan" # Files cleaned by SEGAN
 
 # @create_after(executed='prepare_data', target_regex='*.*')
@@ -188,9 +204,10 @@ def task_backup_results():
 
     # TODO get backup_list automatically from contents of enhanced_dir
     backup_list = [
-        ('segan', SEGAN_ENHANCED_DIR),
+        # ('segan', SEGAN_ENHANCED_DIR),
         ('basic', BASIC_ENHANCED_DIR),
-        ('lstm',LSTM_ENHANCED_DIR)
+        ('lstm',LSTM_ENHANCED_DIR),
+        ('gru',GRU_ENHANCED_DIR)
     ]
 
     # Copy sample files from enhanced dir to sample_dir, saving deps produced
