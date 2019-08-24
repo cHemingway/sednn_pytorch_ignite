@@ -89,16 +89,14 @@ class DNN(nn.Module):
 
 class LSTM(nn.Module):
     ''' LSTM based on 'A new feature set for masking-based monaural speech seperation '''
-    def __init__(self, n_concat, freq_bins, *, dropout=0.2):
+    def __init__(self, n_concat, freq_bins, *, dropout=0.2, hidden_units = 1024,
+                timestep=64, rnn_size = 512):
         
         super().__init__()
         
         self.dropout = dropout
-
-        # TODO these should be passed in from main
-        hidden_units = 1024
-        self.lstm_size = 512
-        self.lstm_timestep = 64 # Timestep of LSTM, and size of mini_batch
+        self.lstm_size = rnn_size
+        self.lstm_timestep = timestep # Timestep of LSTM, and size of mini_batch
 
         # From the paper, "The model consists of
         # One fully connected layer of size 1024
