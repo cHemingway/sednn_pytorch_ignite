@@ -16,6 +16,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/prepare_data.py",
+            "cwd": "${workspaceRoot}",
             "args": [
                 "calculate_mixture_features",
                 "--workspace=workspace",
@@ -40,7 +41,7 @@
                 "pack_features",
                 "--workspace=workspace",
                 "--data_type=train",
-                "--snr=0",
+                "--snr=5",
                 "--n_concat=7",
                 "--n_hop=3"
             ],
@@ -56,8 +57,10 @@
                 "LSTM",
                 "train",
                 "--workspace=workspace_full",
-                "--tr_snr=0",
-                "--te_snr=0"
+                "--tr_snr=5",
+                "--te_snr=5",
+                "--batch_size=1000",
+                "--timestep=32"
             ],
             // "args" : [
             //     "DNN",

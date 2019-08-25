@@ -73,7 +73,7 @@ class Data_Prepare_creator(object):
                     f"--data_type={data_type} "
                     f"--snr={snr} "
                     f"--extra_speech_db={self.config['extra_speech_db']} "
-                    # f"--mrcg "
+                    f"--mrcg "
                 )
             ],
             'clean': True,

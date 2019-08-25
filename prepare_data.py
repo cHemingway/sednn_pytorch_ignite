@@ -29,6 +29,8 @@ import multiprocessing
 # ! HACK: fix onset of noise to zero
 FIXED_NOISE_ONSET = True
 
+# Disable multiprocessing here for easy debug
+USE_MULTIPROCESSING = True
 
 ## Utility functions
 def get_audio_length(audio_path):
@@ -213,7 +215,12 @@ def calculate_features(args, row):
     
     # Extract MRCG on request
     if args.mrcg:
-        mrcg = MRCG.mrcg_extract(mixed_audio, sample_rate)
+        # Make sure MRCG is the same length as the sample rate
+        mrcg_window = config.window_size
+        cochs, del0, ddel = MRCG.mrcg_extract_components(mixed_audio, 
+                                                         sample_rate, 
+                                                         window_len = mrcg_window)
+        mrcg = cochs # Use only cochleagrams, not differences
     else:
         mrcg = None
 
@@ -244,7 +251,7 @@ def calculate_mixture_features(args):
     # Further args get passed to calculate_features function
 
     if args.mrcg:
-        logging.info("Calculating MRCG as well")
+        logging.warning("Calculating MRCG as well")
     
     # Paths
     mixture_csv_path = os.path.join(workspace, 'mixture_csvs', '{}.csv'.format(data_type))
@@ -257,22 +264,30 @@ def calculate_mixture_features(args):
     # Create progress bar
     pbar = tqdm(desc="Calculating {} features".format(data_type), total=len(rows))
 
-    # Use multiprocessing to call calculate_features on each row of CSV
-    # We use imap to get a progress bar here, see https://github.com/tqdm/tqdm/issues/484#issuecomment-351001534
-    pool = multiprocessing.Pool()
-
     # Create partial function of calculate_features so only rows var is changed
     apply_row = functools.partial(calculate_features, 
                                   args
                                   #rows is passed here
                                   )
 
-    for _ in pool.imap_unordered(apply_row, rows):
-        pbar.update() # Update progress bar
+    if USE_MULTIPROCESSING:
+        # Use multiprocessing to call calculate_features on each row of CSV
+        # We use imap to get a progress bar here, see https://github.com/tqdm/tqdm/issues/484#issuecomment-351001534
+        pool = multiprocessing.Pool()
 
-    pool.close()
-    pool.join() # Block until all finished
-    pbar.close() # Close progress bar
+        for _ in pool.imap_unordered(apply_row, rows):
+            pbar.update() # Update progress bar
+
+        pool.close()
+        pool.join() # Block until all finished
+        pbar.close() # Close progress bar
+
+    else:
+        # Single threaded for debugging
+        for r in rows:
+            apply_row(r)
+            pbar.update()
+
     
 
 def get_extras(row: dict) -> Tuple[str, int, int]:
@@ -380,6 +395,7 @@ def pack_features(args):
     create_folder(os.path.dirname(hdf5_path))
     
     x_all = []  # (n_segs, n_concat, n_freq)
+    mrcg_all = [] # (n_segs, coch1-4, ch0-64)
     y_all = []  # (n_segs, n_freq)
     
 
@@ -411,20 +427,32 @@ def pack_features(args):
         y = log_sp(y).astype(np.float32) 
         y_all.append(y)
 
-        # TODO MRCG needs to be fetched and cut here to consistent slices
-        # Need to split into _components_, then slice
-        # Might mean delta() needs to get changed as well?
-        # Would have been easier if audio was sliced at the beginning tbh
-        
+        # MRCG is of shape (CGn, (ch, time))
+        # Need to stack and reorder to (time, CGn, ch)
+        if mrcg is not None:
+            mrcg_3d = []
+            for cg in mrcg:
+                cg = cg.T# Transpose (ch, time) to (time, ch)
+                cg = pad_with_border(cg, n_pad) # Pad each cochleagram
+                # Concat and unconcat to get same padding logic as x, y
+                mrcg_cg_3d = mat_2d_to_3d(cg, agg_num=n_concat, hop=n_hop)
+                mrcg_cg_2d = mrcg_cg_3d[:, (n_concat - 1) // 2, :]
+                mrcg_3d.append(mrcg_cg_2d)
+            mrcg_3d = np.stack(mrcg_3d, axis=0)
+            mrcg_3d = np.swapaxes(mrcg_3d, 0 , 1) 
+            mrcg_3d = mrcg_3d.astype(np.float32) # Half the disk
+            mrcg_all.append(mrcg_3d)
+
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
+    mrcg_all = np.concatenate(mrcg_all, axis=0) # (n_segs, cg_n, n_ch)
 
     # Write out data to hdf5 file. 
     logging.debug("Saving..")
     with h5py.File(hdf5_path, 'w') as hf:
         hf.create_dataset('x', data=x_all)
         hf.create_dataset('y', data=y_all)
-        # TODO add MRCG to dataset
+        hf.create_dataset('mrcg', data=mrcg_all)
     
     logging.info('Write out to {}'.format(hdf5_path))
     
