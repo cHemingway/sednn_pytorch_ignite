@@ -77,7 +77,7 @@ class DNN(nn.Module):
         x = input.view(batch_size, n_concat * freq_bins)
         
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # No dropout on input layer
         x = F.relu(self.fc2(x))
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.relu(self.fc3(x))
@@ -199,7 +199,7 @@ class GRU(nn.Module):
 
         # Run fully connected nets
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # No dropout on input layer
         x = F.relu(self.fc2(x))
         x = F.dropout(x, p=self.dropout, training=self.training)
 
