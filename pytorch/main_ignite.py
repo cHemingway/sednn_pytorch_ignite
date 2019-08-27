@@ -395,13 +395,15 @@ def inference(args, model_vars):
     # Hack to remove results of DataParallel
     # See https://discuss.pytorch.org/t/solved-keyerror-unexpected-key-module-encoder-embedding-weight-in-state-dict/1686/4
     # TODO detect if required, e.g. might be trained on only 1 GPU
-    from collections import OrderedDict
-    new_state_dict = OrderedDict()
-    for k, v in state_dict.items():
-        name = k[7:] # remove `module.`
-        new_state_dict[name] = v
-    
-    model.load_state_dict(new_state_dict)
+    if "ght" in state_dict:
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            name = k[7:] # remove `module.`
+            new_state_dict[name] = v
+        model.load_state_dict(new_state_dict)
+    else:
+        model.load_state_dict(state_dict)
     
     # Move model to device if needed
     model.to(device)
