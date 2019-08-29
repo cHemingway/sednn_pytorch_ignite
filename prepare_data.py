@@ -445,7 +445,9 @@ def pack_features(args):
 
     x_all = np.concatenate(x_all, axis=0)   # (n_segs, n_concat, n_freq)
     y_all = np.concatenate(y_all, axis=0)   # (n_segs, n_freq)
-    mrcg_all = np.concatenate(mrcg_all, axis=0) # (n_segs, cg_n, n_ch)
+    if len(mrcg_all) > 0:
+        mrcg_all = np.concatenate(mrcg_all, axis=0) # (n_segs, cg_n, n_ch)
+        
 
     # Write out data to hdf5 file. 
     logging.debug("Saving..")
